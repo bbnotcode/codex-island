@@ -19,7 +19,7 @@ struct StyleTile<Preview: View>: View {
                 Text(displayLabel)
                     .font(Typography.micro)
                     .foregroundStyle(isOn
-                        ? Color(red: 0.58, green: 0.75, blue: 1.0)
+                        ? Color.primary.opacity(0.90)
                         : Color.primary.opacity(0.55))
             }
             .frame(maxWidth: .infinity)

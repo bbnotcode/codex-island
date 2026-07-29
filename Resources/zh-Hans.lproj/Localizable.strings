@@ -117,6 +117,10 @@
 "Error" = "异常";
 "Open Codex" = "打开 Codex";
 "Open this task in Codex" = "在 Codex 中打开此任务";
+"Unable to open Codex" = "无法打开 Codex";
+"Codex is not installed on this Mac." = "这台 Mac 尚未安装 Codex。";
+"Codex could not be opened." = "Codex 无法启动。";
+"OK" = "好";
 "Codex status: %@" = "Codex 状态：%@";
 "%@ — open in Codex" = "%@ — 在 Codex 中打开";
 "Status display" = "状态显示";

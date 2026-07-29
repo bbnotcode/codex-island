@@ -402,10 +402,12 @@ private struct CompactCodexTaskStatusOverlay: View {
                 if showsDetails {
                     ZStack {
                         HStack(spacing: 0) {
-                            Text(elapsedUpdate)
-                                .font(Typography.bodyNumber)
-                                .foregroundStyle(statusColor)
-                                .frame(width: 44, alignment: .center)
+                            TimelineView(.periodic(from: .now, by: 30)) { context in
+                                Text(elapsedUpdate(at: context.date))
+                                    .font(Typography.bodyNumber)
+                                    .foregroundStyle(statusColor)
+                                    .frame(width: 44, alignment: .center)
+                            }
 
                             Text(L10n.tr(store.snapshot.status.compactLabel))
                                 .font(Typography.bodyNumber)
@@ -461,9 +463,9 @@ private struct CompactCodexTaskStatusOverlay: View {
         CodexTaskStatusGlyph.color(for: store.snapshot.status)
     }
 
-    private var elapsedUpdate: String {
+    private func elapsedUpdate(at now: Date) -> String {
         guard let date = store.snapshot.updatedAt else { return "—" }
-        return Duration.compact(max(0, Date().timeIntervalSince(date)))
+        return Duration.compact(max(0, now.timeIntervalSince(date)))
     }
 }
 

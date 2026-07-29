@@ -82,6 +82,7 @@ final class CodexTaskStatusStore: ObservableObject {
 
     private var timer: Timer?
     private var refreshInFlight = false
+    private var lastScanFingerprint: String?
 
     private init() {
         enabled = Pref.seededBool(
@@ -97,7 +98,7 @@ final class CodexTaskStatusStore: ObservableObject {
     func start() {
         guard timer == nil else { return }
         refresh()
-        timer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
+        timer = Timer.scheduledTimer(withTimeInterval: 15, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.refresh() }
         }
     }
@@ -118,28 +119,64 @@ final class CodexTaskStatusStore: ObservableObject {
     private func openCodexApp() {
         guard let appURL = NSWorkspace.shared.urlForApplication(
             withBundleIdentifier: "com.openai.codex"
-        ) else { return }
+        ) else {
+            showOpenFailure(L10n.tr("Codex is not installed on this Mac."))
+            return
+        }
         NSWorkspace.shared.openApplication(
             at: appURL,
             configuration: NSWorkspace.OpenConfiguration()
-        )
+        ) { [weak self] _, error in
+            guard error != nil else { return }
+            Task { @MainActor in
+                self?.showOpenFailure(L10n.tr("Codex could not be opened."))
+            }
+        }
+    }
+
+    private func showOpenFailure(_ detail: String) {
+        let alert = NSAlert()
+        alert.messageText = L10n.tr("Unable to open Codex")
+        alert.informativeText = detail
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: L10n.tr("OK"))
+        alert.runModal()
     }
 
     private func refresh() {
         guard enabled, !refreshInFlight else { return }
         refreshInFlight = true
+        let previousFingerprint = lastScanFingerprint
         Task { [weak self] in
             let result = await Task.detached(priority: .utility) {
-                Self.scan()
+                Self.scan(previousFingerprint: previousFingerprint)
             }.value
             guard let self else { return }
-            self.snapshot = result
+            self.lastScanFingerprint = result.fingerprint
+            if let snapshot = result.snapshot {
+                self.snapshot = snapshot
+            }
             self.refreshInFlight = false
         }
     }
 
-    nonisolated private static func scan() -> Snapshot {
+    private struct ScanResult: Sendable {
+        let fingerprint: String
+        let snapshot: Snapshot?
+    }
+
+    nonisolated private static func scan(previousFingerprint: String?) -> ScanResult {
         let files = recentRolloutFiles()
+        let fingerprint = files.map { url in
+            let values = try? url.resourceValues(
+                forKeys: [.contentModificationDateKey, .fileSizeKey]
+            )
+            return "\(url.path)|\(values?.contentModificationDate?.timeIntervalSince1970 ?? 0)|\(values?.fileSize ?? 0)"
+        }.joined(separator: "\n")
+        guard fingerprint != previousFingerprint else {
+            return ScanResult(fingerprint: fingerprint, snapshot: nil)
+        }
+
         let states = files.compactMap(parseState)
         guard let selected = states.max(by: { lhs, rhs in
             if lhs.status.priority != rhs.status.priority {
@@ -147,9 +184,12 @@ final class CodexTaskStatusStore: ObservableObject {
             }
             return (lhs.updatedAt ?? .distantPast) < (rhs.updatedAt ?? .distantPast)
         }) else {
-            return Snapshot(status: .idle, threadID: nil, updatedAt: nil)
+            return ScanResult(
+                fingerprint: fingerprint,
+                snapshot: Snapshot(status: .idle, threadID: nil, updatedAt: nil)
+            )
         }
-        return selected
+        return ScanResult(fingerprint: fingerprint, snapshot: selected)
     }
 
     nonisolated private static func recentRolloutFiles() -> [URL] {
@@ -162,24 +202,39 @@ final class CodexTaskStatusStore: ObservableObject {
             root = home.appendingPathComponent(".codex/sessions")
         }
 
-        let keys: [URLResourceKey] = [.isRegularFileKey, .contentModificationDateKey]
-        guard let enumerator = FileManager.default.enumerator(
-            at: root,
-            includingPropertiesForKeys: keys,
-            options: [.skipsHiddenFiles]
-        ) else { return [] }
-
         let cutoff = Date().addingTimeInterval(-86400)
         var files: [(URL, Date)] = []
-        for case let url as URL in enumerator {
-            guard url.lastPathComponent.hasPrefix("rollout-"),
-                  url.pathExtension == "jsonl",
-                  let values = try? url.resourceValues(forKeys: Set(keys)),
-                  values.isRegularFile == true,
-                  let modified = values.contentModificationDate,
-                  modified >= cutoff
+        let calendar = Calendar(identifier: .gregorian)
+        for dayOffset in 0...1 {
+            guard let date = calendar.date(byAdding: .day, value: -dayOffset, to: Date()) else {
+                continue
+            }
+            let components = calendar.dateComponents([.year, .month, .day], from: date)
+            guard let year = components.year,
+                  let month = components.month,
+                  let day = components.day
             else { continue }
-            files.append((url, modified))
+            let dayDirectory = root
+                .appendingPathComponent(String(format: "%04d", year))
+                .appendingPathComponent(String(format: "%02d", month))
+                .appendingPathComponent(String(format: "%02d", day))
+            let urls = (try? FileManager.default.contentsOfDirectory(
+                at: dayDirectory,
+                includingPropertiesForKeys: [.isRegularFileKey, .contentModificationDateKey],
+                options: [.skipsHiddenFiles]
+            )) ?? []
+            for url in urls {
+                guard url.lastPathComponent.hasPrefix("rollout-"),
+                      url.pathExtension == "jsonl",
+                      let values = try? url.resourceValues(
+                        forKeys: [.isRegularFileKey, .contentModificationDateKey]
+                      ),
+                      values.isRegularFile == true,
+                      let modified = values.contentModificationDate,
+                      modified >= cutoff
+                else { continue }
+                files.append((url, modified))
+            }
         }
         return files
             .sorted { $0.1 > $1.1 }
