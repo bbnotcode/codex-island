@@ -91,6 +91,7 @@ Claude：
 
 | 设置 | 存储 | UserDefaults key | 值 |
 | --- | --- | --- | --- |
+| 外观 | `AppearanceStore` | `MacIsland.appearance` | `system`, `light`, `dark`，默认 `dark` |
 | 图表样式 | `StylePref` | `MacIsland.chartStyle` | `ring`, `bar`, `stepped`, `numeric`, `spark` |
 | 成本样式 | `CostStylePref` | `MacIsland.costStyle` | `dollar`, `multi`, `tokens`, `spark` |
 | Token 统计 | `TokenCountModeStore` | `MacIsland.tokenCountMode` | `all`, `billable` |
@@ -98,9 +99,32 @@ Claude：
 | 低功耗模式 | `LowPowerModeStore` | `MacIsland.lowPowerMode` | Boolean，默认 `false` |
 | Claude 可见 | `ProviderVisibilityStore` | `MacIsland.claudeVisible` | Boolean，默认 `true` |
 | Codex 可见 | `ProviderVisibilityStore` | `MacIsland.codexVisible` | Boolean，默认 `true` |
+| Codex 任务状态 | `CodexTaskStatusStore` | `MacIsland.codexTaskStatus` | Boolean，默认 `true` |
+| 状态显示 | `CodexTaskStatusStore` | `MacIsland.codexTaskStatusDisplayMode` | `icon`, `iconAndText`，默认 `icon` |
 | 登录启动 | `LaunchAtLoginStore` | 由 `SMAppService.mainApp` 管理 | 系统登录项状态 |
 
-刷新间隔会立即生效。`UsageStore` 会重置当前计时器，并用新的间隔重新安排下一次拉取。
+外观和刷新间隔都会立即生效；选择“跟随系统”后，设置窗口会随 macOS
+浅色/深色外观自动切换。`UsageStore` 会重置当前计时器，并用新的间隔重新安排下一次拉取。
+
+隐藏 Claude、保留 Codex 时，左半区可以显示本地 Codex 任务的五种状态：
+运行中、等待审批、等待用户输入、空闲和异常。状态直接从
+`~/.codex/sessions/**/*.jsonl` 的生命周期事件推断，不修改 Codex 配置，也不显示任务正文、
+命令或输出。状态默认只显示图标，也可以在设置中选择在图标旁显示本地化文字。点击状态卡会
+尝试通过 `codex://threads/<id>` 打开对应任务。
+
+### 为什么设计 Codex 任务状态视图
+
+并不是每位用户都会同时订阅 Claude 和 Codex。当用户只使用 Codex，并在设置中隐藏 Claude
+时，如果左半区始终留空，灵动岛中最适合随时查看的一块空间就没有得到利用。
+
+可选的 Codex 任务状态视图会把这块空出来的区域变成只服务于当前工具的轻量状态面板。它只
+显示最需要关注的本地任务处于运行中、等待审批、等待用户输入、空闲还是异常，不展示提示词、
+命令或输出。用户因此可以一眼判断是否需要回到 Codex 处理；点击状态还可以打开被选中的
+Codex 任务。
+
+在收起状态下，左侧状态组与右侧 Codex 额度组采用对应的三个组件：持续时间、当前状态和状态
+图标。展开后，同一套五状态视觉语言会填充原本空置的服务商栏位。如果用户更喜欢原有的按模型
+Token 用量视图，也可以随时在设置中关闭此功能。
 
 ## 从源码构建
 

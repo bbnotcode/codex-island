@@ -111,10 +111,14 @@ XPC_DIR="$FRAMEWORKS_DIR/Sparkle.framework/Versions/Current/XPCServices"
 for xpc in Installer.xpc Downloader.xpc; do
   XPC_PATH="$XPC_DIR/$xpc"
   if [[ -d "$XPC_PATH" ]]; then
+    # File Provider may reattach FinderInfo to package directories after a
+    # recursive xattr pass, so clear every entry immediately before signing.
+    find "$XPC_PATH" -exec xattr -c {} \;
     codesign --force --sign - --timestamp=none \
       --preserve-metadata=identifier,entitlements,flags "$XPC_PATH"
   fi
 done
+find "$FRAMEWORKS_DIR/Sparkle.framework" -exec xattr -c {} \;
 codesign --force --sign - --timestamp=none "$FRAMEWORKS_DIR/Sparkle.framework"
 
 echo "✓ built $APP_DIR ($VERSION)"

@@ -184,17 +184,45 @@ Settings is a custom `NSWindow`, not the system Settings scene. The app still
 runs as an accessory app with no Dock icon and no menu bar.
 
 - **General:** Launch at Login, 5m/15m/30m refresh interval, app language,
-  Always show usage, Low Power Mode, configurable limit alerts, and Sparkle
-  update controls.
+  light/dark/system appearance, Always show usage, Low Power Mode,
+  configurable limit alerts, and Sparkle update controls.
 - **Display:** used/remaining percentages, Usage and Cost visualization styles,
   target display, and island width on non-notched screens.
 - **Providers:** Claude/Codex visibility and status, token-counting mode, and a
-  manual refresh for local cost data.
+  manual refresh for local cost data. When Claude is hidden, the freed half
+  can show the most important local Codex task state and open that task.
 
 Preferences are stored in `UserDefaults` under `MacIsland.*` keys (Sparkle
 manages its own `SU*` update keys, and Launch at Login uses
-`SMAppService.mainApp`). Refresh, display, and provider changes apply live;
-changing the app language offers to restart CodexIsland.
+`SMAppService.mainApp`). Appearance, refresh, display, and provider changes
+apply live; changing the app language offers to restart CodexIsland.
+
+Codex task status is inferred locally from recent
+`~/.codex/sessions/**/*.jsonl` lifecycle events. CodexIsland keeps only the
+five display states (running, waiting for approval, waiting for input, idle,
+and error), a thread ID for deep-linking, and the update time. It does not
+display task prompts, commands, or output, and it does not modify Codex
+configuration. The status uses icons by default; an optional setting adds a
+localized label beside the icon.
+
+### Why the Codex task status view exists
+
+Not everyone subscribes to both Claude and Codex. When a user works only with
+Codex and hides Claude, leaving the entire Claude half empty wastes the most
+glanceable part of the island.
+
+The optional Codex task status view turns that freed space into a focused
+companion for the service the user actually uses. It shows only whether the
+most urgent local task is running, waiting for approval, waiting for input,
+idle, or in an error state. This is enough to tell the user when attention is
+needed without exposing prompts, commands, or output. Clicking the status
+opens the selected task in Codex.
+
+In the compact island, the status group mirrors the Codex quota group with
+three aligned components: elapsed time, current state, and a state icon. In
+the expanded panel, the same five-state visual language fills the otherwise
+unused provider column. Users who prefer the original per-model token
+breakdown can disable the feature at any time.
 
 ## Build from source
 

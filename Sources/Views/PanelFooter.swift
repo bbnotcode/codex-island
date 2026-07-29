@@ -35,19 +35,7 @@ struct PanelFooter: View {
             ZStack(alignment: .center) {
                 HStack(spacing: 10) {
                     chip
-
-                    if !activeStyleCycled {
-                        HStack(spacing: 5) {
-                            Image(systemName: "command")
-                                .font(Typography.micro)
-                            Text(L10n.tr("click to cycle"))
-                                .font(Typography.label)
-                        }
-                        .foregroundStyle(.white.opacity(0.42))
-                        .transition(.opacity.combined(with: .scale(scale: 0.92, anchor: .leading)))
-                        .accessibilityElement(children: .combine)
-                        .accessibilityLabel(cycleHintAccessibilityLabel)
-                    }
+                    shortcutHints
 
                     Spacer()
 
@@ -64,25 +52,35 @@ struct PanelFooter: View {
             .padding(.horizontal, 22)
             .padding(.top, 6)
             .padding(.bottom, 10)
-            .animation(.strongEaseOut, value: pref.hasCycledStyle)
-            .animation(.strongEaseOut, value: costPref.hasCycledStyle)
             .animation(.strongEaseOut, value: screenPref.screen)
         }
     }
 
-    private var activeStyleCycled: Bool {
-        switch screenPref.screen {
-        case .usage: return pref.hasCycledStyle
-        case .cost:  return costPref.hasCycledStyle
-        case .overview: return true
+    private var shortcutHints: some View {
+        HStack(spacing: 9) {
+            if screenPref.screen != .overview {
+                shortcutHint(keys: "click", label: "cycle view")
+                Rectangle()
+                    .fill(.white.opacity(0.12))
+                    .frame(width: 1, height: 10)
+                    .accessibilityHidden(true)
+            }
+            shortcutHint(keys: "1 2 3", label: "switch page")
         }
+        .foregroundStyle(.white.opacity(0.42))
+        .animation(.strongEaseOut, value: screenPref.screen)
     }
 
-    private var cycleHintAccessibilityLabel: String {
-        switch screenPref.screen {
-        case .overview: return L10n.tr("Overview shows %@ usage history", currentYearString)
-        case .usage, .cost: return L10n.tr("Tip: Command-click to cycle visualization")
+    private func shortcutHint(keys: String, label: String) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: "command")
+                .font(Typography.micro)
+            Text(L10n.tr(keys))
+                .font(Typography.bodyNumber)
+            Text(L10n.tr(label))
+                .font(Typography.label)
         }
+        .accessibilityElement(children: .combine)
     }
 
     @ViewBuilder

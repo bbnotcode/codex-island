@@ -85,6 +85,15 @@ struct IslandRootView: View {
                         topPadding: max(0, (model.notch.height - 20) / 2)
                     )
                 }
+                .overlay(alignment: .topLeading) {
+                    if model.state != .expanded {
+                        CompactCodexTaskStatusOverlay(
+                            edgePadding: logoEdgePadding,
+                            topPadding: max(0, (model.notch.height - 20) / 2),
+                            showsDetails: model.state == .peek
+                        )
+                    }
+                }
                 .overlay(alignment: .topTrailing) {
                     LogoOverlay(
                         image: openaiLogo,
@@ -370,6 +379,91 @@ struct IslandRootView: View {
         case .compact, .expanded: return 9
         case .peek:               return model.pillSlotWidth + 9
         }
+    }
+}
+
+/// Uses the hidden Claude logo slot for a compact Codex task signal. This
+/// keeps the collapsed silhouette visually balanced without adding text or
+/// changing its width. The expanded panel continues to use the full status
+/// card.
+private struct CompactCodexTaskStatusOverlay: View {
+    let edgePadding: CGFloat
+    let topPadding: CGFloat
+    let showsDetails: Bool
+
+    @ObservedObject private var visibility = ProviderVisibilityStore.shared
+    @ObservedObject private var store = CodexTaskStatusStore.shared
+
+    var body: some View {
+        if shouldShow {
+            Button {
+                store.openThread()
+            } label: {
+                if showsDetails {
+                    ZStack {
+                        HStack(spacing: 0) {
+                            Text(elapsedUpdate)
+                                .font(Typography.bodyNumber)
+                                .foregroundStyle(statusColor)
+                                .frame(width: 44, alignment: .center)
+
+                            Text(L10n.tr(store.snapshot.status.compactLabel))
+                                .font(Typography.bodyNumber)
+                                .foregroundStyle(.white.opacity(0.68))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.75)
+                                .frame(width: 44, alignment: .center)
+
+                            CodexTaskStatusGlyph(
+                                status: store.snapshot.status,
+                                size: 22,
+                                showsBackground: false
+                            )
+                            .shadow(color: statusColor.opacity(0.40), radius: 4)
+                            .frame(width: 44, alignment: .center)
+                        }
+
+                        Text("·")
+                            .font(Typography.bodyNumber)
+                            .foregroundStyle(.white.opacity(0.32))
+                            .offset(x: -22)
+                    }
+                    .frame(width: 132)
+                    .padding(.leading, edgePadding)
+                    .padding(.top, max(0, topPadding - 1))
+                    .offset(x: -109)
+                } else {
+                    CodexTaskStatusGlyph(
+                        status: store.snapshot.status,
+                        size: 22,
+                        showsBackground: false
+                    )
+                    .shadow(color: statusColor.opacity(0.40), radius: 4)
+                    .padding(.leading, edgePadding)
+                    .padding(.top, max(0, topPadding - 1))
+                }
+            }
+            .buttonStyle(.plain)
+            .help(L10n.tr("%@ — open in Codex", L10n.tr(store.snapshot.status.label)))
+            .accessibilityLabel(
+                L10n.tr("Codex status: %@", L10n.tr(store.snapshot.status.label))
+            )
+            .accessibilityHint(L10n.tr("Open this task in Codex"))
+            .animation(.strongEaseOut, value: store.snapshot)
+        }
+    }
+
+    private var shouldShow: Bool {
+        store.enabled && !visibility.claudeVisible && visibility.codexVisible
+    }
+
+    private var statusColor: Color {
+        CodexTaskStatusGlyph.color(for: store.snapshot.status)
+    }
+
+    private var elapsedUpdate: String {
+        guard let date = store.snapshot.updatedAt else { return "—" }
+        return Duration.compact(max(0, Date().timeIntervalSince(date)))
     }
 }
 
