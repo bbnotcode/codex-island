@@ -250,6 +250,7 @@ final class CodexTaskStatusStore: ObservableObject {
         else { return nil }
 
         var status = Status.idle
+        var currentTurnFailed = false
         for line in data.split(separator: 0x0A) {
             guard line.count < 1_048_576,
                   let raw = try? JSONSerialization.jsonObject(with: Data(line)) as? [String: Any],
@@ -259,16 +260,25 @@ final class CodexTaskStatusStore: ObservableObject {
             else { continue }
 
             switch event {
-            case "task_started", "user_message", "exec_command_begin",
-                 "apply_patch_begin", "mcp_tool_call_begin":
+            case "task_started", "user_message":
+                currentTurnFailed = false
                 status = .running
+            case "exec_command_begin", "apply_patch_begin", "mcp_tool_call_begin":
+                if !currentTurnFailed {
+                    status = .running
+                }
             case "exec_approval_request", "apply_patch_approval_request":
-                status = .waitingApproval
+                if !currentTurnFailed {
+                    status = .waitingApproval
+                }
             case "request_user_input", "elicitation_request":
-                status = .waitingUserInput
+                if !currentTurnFailed {
+                    status = .waitingUserInput
+                }
             case "task_complete":
-                status = .idle
+                status = currentTurnFailed ? .error : .idle
             case "turn_aborted", "error", "stream_error":
+                currentTurnFailed = true
                 status = .error
             default:
                 break
