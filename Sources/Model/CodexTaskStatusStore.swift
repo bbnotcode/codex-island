@@ -243,46 +243,18 @@ final class CodexTaskStatusStore: ObservableObject {
     }
 
     nonisolated private static func parseState(at url: URL) -> Snapshot? {
-        guard let data = tailData(at: url),
+        guard let parsed = CodexTaskStatusLogParser.parse(at: url),
               let modified = try? url.resourceValues(
                 forKeys: [.contentModificationDateKey]
               ).contentModificationDate
         else { return nil }
 
-        var status = Status.idle
-        var currentTurnFailed = false
-        for line in data.split(separator: 0x0A) {
-            guard line.count < 1_048_576,
-                  let raw = try? JSONSerialization.jsonObject(with: Data(line)) as? [String: Any],
-                  (raw["type"] as? String) == "event_msg",
-                  let payload = raw["payload"] as? [String: Any],
-                  let event = payload["type"] as? String
-            else { continue }
-
-            switch event {
-            case "task_started", "user_message":
-                currentTurnFailed = false
-                status = .running
-            case "exec_command_begin", "apply_patch_begin", "mcp_tool_call_begin":
-                if !currentTurnFailed {
-                    status = .running
-                }
-            case "exec_approval_request", "apply_patch_approval_request":
-                if !currentTurnFailed {
-                    status = .waitingApproval
-                }
-            case "request_user_input", "elicitation_request":
-                if !currentTurnFailed {
-                    status = .waitingUserInput
-                }
-            case "task_complete":
-                status = currentTurnFailed ? .error : .idle
-            case "turn_aborted", "error", "stream_error":
-                currentTurnFailed = true
-                status = .error
-            default:
-                break
-            }
+        let status: Status = switch parsed {
+        case .running: .running
+        case .waitingApproval: .waitingApproval
+        case .waitingUserInput: .waitingUserInput
+        case .idle: .idle
+        case .error: .error
         }
 
         return Snapshot(
@@ -290,15 +262,6 @@ final class CodexTaskStatusStore: ObservableObject {
             threadID: threadID(from: url),
             updatedAt: modified
         )
-    }
-
-    nonisolated private static func tailData(at url: URL) -> Data? {
-        guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
-        defer { try? handle.close() }
-        let length = (try? handle.seekToEnd()) ?? 0
-        let maxBytes: UInt64 = 512 * 1024
-        try? handle.seek(toOffset: length > maxBytes ? length - maxBytes : 0)
-        return try? handle.readToEnd()
     }
 
     nonisolated private static func threadID(from url: URL) -> String? {

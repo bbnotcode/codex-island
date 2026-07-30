@@ -32,6 +32,14 @@ swiftc \
 
 swiftc \
   -parse-as-library \
+  -o "$OUT_DIR/codex-task-status-log-parser-tests" \
+  Sources/Model/CodexTaskStatusLogParser.swift \
+  Tests/CodexTaskStatusLogParserTests.swift
+
+"$OUT_DIR/codex-task-status-log-parser-tests"
+
+swiftc \
+  -parse-as-library \
   -o "$OUT_DIR/usage-merge-tests" \
   Sources/Model/UsageDisplayModeStore.swift \
   Sources/Usage/AppUsage.swift \
