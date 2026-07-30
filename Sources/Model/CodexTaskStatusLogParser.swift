@@ -10,76 +10,107 @@ enum CodexTaskLogState: Equatable {
 
 struct CodexTaskStatusLogParser {
     private static let newline: UInt8 = 0x0A
+    private static let cache = StateCache()
+
+    private struct CacheEntry {
+        let offset: UInt64
+        let state: CodexTaskLogState
+        let currentTurnFailed: Bool
+    }
+
+    private final class StateCache: @unchecked Sendable {
+        private let lock = NSLock()
+        private var entries: [URL: CacheEntry] = [:]
+
+        func entry(for url: URL) -> CacheEntry? {
+            lock.lock()
+            defer { lock.unlock() }
+            return entries[url]
+        }
+
+        func set(_ entry: CacheEntry, for url: URL) {
+            lock.lock()
+            defer { lock.unlock() }
+            entries[url] = entry
+        }
+    }
 
     static func parse(at url: URL, maxBytes: UInt64 = 512 * 1024) -> CodexTaskLogState? {
-        guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
+        guard maxBytes > 0,
+              let handle = try? FileHandle(forReadingFrom: url)
+        else { return nil }
         defer { try? handle.close() }
 
         let length = (try? handle.seekToEnd()) ?? 0
-        let rawStart = length > maxBytes ? length - maxBytes : 0
-        let tailStart = completeLineStart(handle: handle, rawStart: rawStart)
-        let failedBeforeTail = failureMarker(handle: handle, before: tailStart)
-        try? handle.seek(toOffset: tailStart)
-        guard let tail = try? handle.readToEnd() else { return nil }
-        return parse(tail, currentTurnFailed: failedBeforeTail).state
+        let cached = cache.entry(for: url)
+        let canContinue = cached.map {
+            length >= $0.offset && length - $0.offset <= maxBytes
+        } ?? false
+        let readStart: UInt64
+        let initialState: CodexTaskLogState
+        let initialFailure: Bool
+        if canContinue, let cached {
+            readStart = cached.offset
+            initialState = cached.state
+            initialFailure = cached.currentTurnFailed
+        } else {
+            readStart = length > maxBytes ? length - maxBytes : 0
+            initialState = .idle
+            initialFailure = false
+        }
+
+        try? handle.seek(toOffset: readStart)
+        let readLimit = Int(min(maxBytes, UInt64(Int.max)))
+        guard let raw = try? handle.read(upToCount: readLimit) else { return nil }
+        let complete = completeLines(
+            in: raw,
+            droppingLeadingPartialLine: !canContinue && readStart > 0
+        )
+        let result = parse(
+            complete.data,
+            initialState: initialState,
+            currentTurnFailed: initialFailure
+        )
+        cache.set(
+            CacheEntry(
+                offset: readStart + UInt64(complete.consumedBytes),
+                state: result.state,
+                currentTurnFailed: result.currentTurnFailed
+            ),
+            for: url
+        )
+        return result.state
     }
 
-    private static func completeLineStart(
-        handle: FileHandle,
-        rawStart: UInt64
-    ) -> UInt64 {
-        guard rawStart > 0 else { return 0 }
-        try? handle.seek(toOffset: rawStart - 1)
-        guard let boundary = try? handle.read(upToCount: 1),
-              boundary.first != newline
-        else { return rawStart }
-
-        try? handle.seek(toOffset: rawStart)
-        var offset = rawStart
-        while let chunk = try? handle.read(upToCount: 64 * 1024),
-              !chunk.isEmpty {
-            if let newlineIndex = chunk.firstIndex(of: newline) {
-                return offset + UInt64(newlineIndex + 1)
+    private static func completeLines(
+        in data: Data,
+        droppingLeadingPartialLine: Bool
+    ) -> (data: Data, consumedBytes: Int) {
+        var lowerBound = data.startIndex
+        if droppingLeadingPartialLine {
+            guard let firstNewline = data.firstIndex(of: newline) else {
+                return (Data(), 0)
             }
-            offset += UInt64(chunk.count)
+            lowerBound = data.index(after: firstNewline)
         }
-        return offset
-    }
-
-    private static func failureMarker(
-        handle: FileHandle,
-        before endOffset: UInt64
-    ) -> Bool {
-        guard endOffset > 0 else { return false }
-        try? handle.seek(toOffset: 0)
-        var remaining = endOffset
-        var pending = Data()
-        var currentTurnFailed = false
-
-        while remaining > 0 {
-            let count = Int(min(remaining, 64 * 1024))
-            guard let chunk = try? handle.read(upToCount: count),
-                  !chunk.isEmpty
-            else { break }
-            remaining -= UInt64(chunk.count)
-            pending.append(chunk)
-
-            while let newlineIndex = pending.firstIndex(of: newline) {
-                updateFailureMarker(
-                    event: eventType(in: pending[..<newlineIndex]),
-                    currentTurnFailed: &currentTurnFailed
-                )
-                pending.removeSubrange(...newlineIndex)
-            }
+        guard let lastNewline = data.lastIndex(of: newline),
+              lastNewline >= lowerBound
+        else {
+            return (Data(), 0)
         }
-        return currentTurnFailed
+        let upperBound = data.index(after: lastNewline)
+        return (
+            Data(data[lowerBound..<upperBound]),
+            data.distance(from: data.startIndex, to: upperBound)
+        )
     }
 
     private static func parse(
         _ data: Data,
+        initialState: CodexTaskLogState,
         currentTurnFailed initialFailure: Bool
     ) -> (state: CodexTaskLogState, currentTurnFailed: Bool) {
-        var state: CodexTaskLogState = initialFailure ? .error : .idle
+        var state = initialState
         var currentTurnFailed = initialFailure
 
         for line in data.split(separator: newline) {
@@ -110,20 +141,6 @@ struct CodexTaskStatusLogParser {
             }
         }
         return (state, currentTurnFailed)
-    }
-
-    private static func updateFailureMarker(
-        event: String?,
-        currentTurnFailed: inout Bool
-    ) {
-        switch event {
-        case "task_started", "user_message":
-            currentTurnFailed = false
-        case "turn_aborted", "error", "stream_error":
-            currentTurnFailed = true
-        default:
-            break
-        }
     }
 
     private static func eventType(in line: Data.SubSequence) -> String? {
