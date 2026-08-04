@@ -99,10 +99,21 @@ Claude：
 | 低功耗模式 | `LowPowerModeStore` | `MacIsland.lowPowerMode` | Boolean，默认 `false` |
 | Claude 可见 | `ProviderVisibilityStore` | `MacIsland.claudeVisible` | Boolean，默认 `true` |
 | Codex 可见 | `ProviderVisibilityStore` | `MacIsland.codexVisible` | Boolean，默认 `true` |
+| Codex 任务状态 | `CodexTaskStatusStore` | `MacIsland.codexTaskStatus` | Boolean，默认 `false` |
+| 状态显示 | `CodexTaskStatusStore` | `MacIsland.codexTaskStatusDisplayMode` | `icon`, `iconAndText`，默认 `icon` |
 | 登录启动 | `LaunchAtLoginStore` | 由 `SMAppService.mainApp` 管理 | 系统登录项状态 |
 
 外观和刷新间隔都会立即生效；选择“跟随系统”后，设置窗口会随 macOS
 浅色/深色外观自动切换。`UsageStore` 会重置当前计时器，并用新的间隔重新安排下一次拉取。
+
+隐藏 Claude、保留 Codex 时，可以选择显示本地 Codex 任务状态。状态从
+`~/.codex/sessions/**/*.jsonl` 当前实际记录的生命周期事件推断，只显示运行中、空闲、
+已取消、异常和不可用。当前 rollout 文件并不记录审批或等待用户输入事件，因此本功能不会
+声称能够识别这两种状态。
+
+该功能默认关闭，并且只有在功能已开启、Claude 已隐藏且 Codex 可见时才轮询。收起和预览
+状态仅用于显示，不会抢占灵动岛原本的点击展开行为；只有展开后的状态卡会尝试打开 Codex
+任务。关闭功能后会恢复原有的按模型 Token 用量视图。
 
 ## 从源码构建
 
