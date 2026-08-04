@@ -20,6 +20,7 @@ struct SettingsView: View {
     @ObservedObject private var usageDisplay = UsageDisplayModeStore.shared
     @ObservedObject private var targetDisplay = IslandTargetDisplayStore.shared
     @ObservedObject private var appLanguage = AppLanguageStore.shared
+    @ObservedObject private var codexTaskStatus = CodexTaskStatusStore.shared
     @ObservedObject private var usage = UsageStore.shared
     @ObservedObject private var cost = CostStore.shared
     @ObservedObject private var updater = UpdaterController.shared
@@ -515,6 +516,27 @@ struct SettingsView: View {
                     }
                 }
             }
+            SettingsRow(
+                title: "Codex task status",
+                subtitle: "Show local Codex task state when the Claude side is hidden."
+            ) {
+                SettingsToggle(isOn: codexTaskStatus.enabled) {
+                    codexTaskStatus.enabled.toggle()
+                }
+            }
+            SettingsRow(
+                title: "Status display",
+                subtitle: "Choose an icon only or include a localized label."
+            ) {
+                SegmentedControl(
+                    items: CodexTaskStatusStore.DisplayMode.allCases,
+                    selected: $codexTaskStatus.displayMode,
+                    label: \.label,
+                    accessibilityPrefix: "Status display"
+                )
+            }
+            .disabled(!codexTaskStatus.enabled)
+            .opacity(codexTaskStatus.enabled ? 1 : 0.4)
         }
         .padding(.horizontal, 14)
         .padding(.top, 18)
