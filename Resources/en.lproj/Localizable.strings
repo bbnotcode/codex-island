@@ -106,6 +106,7 @@
 "System" = "System";
 "Light" = "Light";
 "Dark" = "Dark";
+"Switch to %@ (⌘%d)" = "Switch to %@ (⌘%d)";
 "Show on" = "Show on";
 "Sparkline" = "Sparkline";
 "Spacing" = "Spacing";

@@ -106,6 +106,7 @@
 "System" = "跟随系统";
 "Light" = "浅色";
 "Dark" = "深色";
+"Switch to %@ (⌘%d)" = "切换到%@（⌘%d）";
 "Show on" = "显示在";
 "Sparkline" = "折线";
 "Spacing" = "间距";
