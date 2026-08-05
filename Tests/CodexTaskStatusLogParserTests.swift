@@ -128,6 +128,30 @@ struct CodexTaskStatusLogParserTests {
             "stale terminal state decays below idle"
         )
 
+        expect(
+            CodexTaskStatusSoundPolicy.event(previous: .running, current: .idle)
+                == .completed,
+            "running to idle emits a completion sound event"
+        )
+        expect(
+            CodexTaskStatusSoundPolicy.event(previous: .running, current: .error)
+                == .attention,
+            "running to error emits an attention sound event"
+        )
+        expect(
+            CodexTaskStatusSoundPolicy.event(previous: .running, current: .cancelled)
+                == .attention,
+            "running to cancelled emits an attention sound event"
+        )
+        expect(
+            CodexTaskStatusSoundPolicy.event(previous: .idle, current: .error) == nil,
+            "startup and non-running transitions stay silent"
+        )
+        expect(
+            CodexTaskStatusSoundPolicy.event(previous: .running, current: .unavailable) == nil,
+            "temporary unavailable state stays silent"
+        )
+
         if failures > 0 {
             print("\(failures) failure(s)")
             exit(1)

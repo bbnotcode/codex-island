@@ -128,6 +128,8 @@
 "Icon" = "仅图标";
 "Icon + Text" = "图标与文字";
 "Updated %@" = "更新于%@";
+"Status sounds" = "状态提示音";
+"Play a sound when a running task completes, is cancelled, or fails." = "运行中的任务完成、取消或失败时播放提示音。";
 "Show on" = "显示在";
 "Sparkline" = "折线";
 "Spacing" = "间距";

@@ -8,6 +8,28 @@ enum CodexTaskLogState: Equatable {
     case unavailable
 }
 
+enum CodexTaskStatusSoundEvent: Equatable {
+    case completed
+    case attention
+}
+
+enum CodexTaskStatusSoundPolicy {
+    static func event(
+        previous: CodexTaskLogState,
+        current: CodexTaskLogState
+    ) -> CodexTaskStatusSoundEvent? {
+        guard previous == .running else { return nil }
+        switch current {
+        case .idle:
+            return .completed
+        case .cancelled, .error:
+            return .attention
+        case .running, .unavailable:
+            return nil
+        }
+    }
+}
+
 enum CodexTaskStatusPolicy {
     static func priority(
         for state: CodexTaskLogState,
