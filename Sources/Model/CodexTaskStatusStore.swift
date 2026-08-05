@@ -7,6 +7,7 @@ final class CodexTaskStatusStore: ObservableObject {
     static let shared = CodexTaskStatusStore()
     private static let enabledKey = "MacIsland.codexTaskStatus"
     private static let displayModeKey = "MacIsland.codexTaskStatusDisplayMode"
+    private static let soundEnabledKey = "MacIsland.codexTaskStatusSound"
 
     enum DisplayMode: String, CaseIterable, Hashable {
         case icon
@@ -66,6 +67,11 @@ final class CodexTaskStatusStore: ObservableObject {
             )
         }
     }
+    @Published var soundEnabled: Bool {
+        didSet {
+            UserDefaults.standard.set(soundEnabled, forKey: Self.soundEnabledKey)
+        }
+    }
     @Published private(set) var snapshot = Snapshot(
         status: .unavailable,
         threadID: nil,
@@ -85,6 +91,10 @@ final class CodexTaskStatusStore: ObservableObject {
         displayMode = Pref.enumValue(
             key: Self.displayModeKey,
             default: .icon
+        )
+        soundEnabled = Pref.seededBool(
+            key: Self.soundEnabledKey,
+            default: false
         )
     }
 
@@ -166,9 +176,42 @@ final class CodexTaskStatusStore: ObservableObject {
             guard let self else { return }
             self.lastScanFingerprint = result.fingerprint
             if let snapshot = result.snapshot {
-                self.snapshot = snapshot
+                self.apply(snapshot)
             }
             self.refreshInFlight = false
+        }
+    }
+
+    private func apply(_ nextSnapshot: Snapshot) {
+        let previousStatus = logState(for: snapshot.status)
+        let nextStatus = logState(for: nextSnapshot.status)
+        snapshot = nextSnapshot
+        guard soundEnabled,
+              let event = CodexTaskStatusSoundPolicy.event(
+                previous: previousStatus,
+                current: nextStatus
+              )
+        else { return }
+        playSound(for: event)
+    }
+
+    private func logState(for status: Status) -> CodexTaskLogState {
+        switch status {
+        case .running: .running
+        case .idle: .idle
+        case .cancelled: .cancelled
+        case .error: .error
+        case .unavailable: .unavailable
+        }
+    }
+
+    private func playSound(for event: CodexTaskStatusSoundEvent) {
+        let name = switch event {
+        case .completed: "Glass"
+        case .attention: "Basso"
+        }
+        if NSSound(named: NSSound.Name(name))?.play() != true {
+            NSSound.beep()
         }
     }
 

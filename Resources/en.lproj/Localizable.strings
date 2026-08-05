@@ -122,6 +122,8 @@
 "Icon" = "Icon";
 "Icon + Text" = "Icon + Text";
 "Updated %@" = "Updated %@";
+"Status sounds" = "Status sounds";
+"Play a sound when a running task completes, is cancelled, or fails." = "Play a sound when a running task completes, is cancelled, or fails.";
 "Show on" = "Show on";
 "Sparkline" = "Sparkline";
 "Spacing" = "Spacing";
