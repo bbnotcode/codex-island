@@ -37,6 +37,12 @@ struct CodexTaskStatusSoundTracker {
 }
 
 enum CodexTaskStatusPolicy {
+    static let terminalDecayInterval: TimeInterval = 10 * 60
+
+    static func isPastTerminalDecay(updatedAt: Date, now: Date = Date()) -> Bool {
+        now.timeIntervalSince(updatedAt) > terminalDecayInterval
+    }
+
     static func priority(
         for state: CodexTaskLogState,
         updatedAt: Date?,
@@ -44,7 +50,7 @@ enum CodexTaskStatusPolicy {
     ) -> Int {
         if state == .error || state == .cancelled,
            let updatedAt,
-           now.timeIntervalSince(updatedAt) > 10 * 60 {
+           isPastTerminalDecay(updatedAt: updatedAt, now: now) {
             return 0
         }
         switch state {
@@ -54,6 +60,20 @@ enum CodexTaskStatusPolicy {
         case .idle: return 1
         case .unavailable: return 0
         }
+    }
+}
+
+enum CodexTaskStatusDirectoryPolicy {
+    static func utcDateComponents(for date: Date) -> DateComponents {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        return calendar.dateComponents([.year, .month, .day], from: date)
+    }
+
+    static func date(daysBefore offset: Int, from date: Date) -> Date? {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        return calendar.date(byAdding: .day, value: -offset, to: date)
     }
 }
 
