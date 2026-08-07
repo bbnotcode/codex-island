@@ -41,14 +41,17 @@ struct CodexTaskStatusLogParserTests {
         )
 
         let filler = String(repeating: "x", count: 180)
+        let growthHandle = try FileHandle(forWritingTo: log)
+        try growthHandle.seekToEnd()
         while data.count < 530 * 1024 {
             let update = event("response_item", detail: filler)
             data.append(update)
-            try update.append(to: log)
+            try growthHandle.write(contentsOf: update)
             if data.count % (64 * 1024) < update.count {
                 _ = CodexTaskStatusLogParser.parse(at: log)
             }
         }
+        try growthHandle.close()
         data.append(event("task_complete"))
         try event("task_complete").append(to: log)
 
@@ -146,6 +149,29 @@ struct CodexTaskStatusLogParserTests {
                 now: now
             ) < CodexTaskStatusPolicy.priority(for: .idle, updatedAt: now, now: now),
             "stale terminal state decays below idle"
+        )
+        expect(
+            !CodexTaskStatusPolicy.isPastTerminalDecay(
+                updatedAt: now.addingTimeInterval(-9 * 60),
+                now: now
+            ) && CodexTaskStatusPolicy.isPastTerminalDecay(
+                updatedAt: now.addingTimeInterval(-11 * 60),
+                now: now
+            ),
+            "terminal decay phase changes after ten minutes"
+        )
+
+        let utcBoundary = ISO8601DateFormatter().date(
+            from: "2026-08-07T01:00:00Z"
+        )!
+        let utcComponents = CodexTaskStatusDirectoryPolicy.utcDateComponents(
+            for: utcBoundary
+        )
+        expect(
+            utcComponents.year == 2026
+                && utcComponents.month == 8
+                && utcComponents.day == 7,
+            "rollout directory components use the UTC date"
         )
 
         var completionSounds = CodexTaskStatusSoundTracker()

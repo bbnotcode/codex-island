@@ -73,6 +73,9 @@ struct PanelHeader: View {
         }
         .padding(.leading, 9)
         .accessibilityElement(children: .combine)
+        .accessibilityLabel(
+            L10n.tr("Codex status: %@", L10n.tr(taskStatus.snapshot.status.label))
+        )
     }
 
     @ViewBuilder
