@@ -13,19 +13,25 @@ enum CodexTaskStatusSoundEvent: Equatable {
     case attention
 }
 
-enum CodexTaskStatusSoundPolicy {
-    static func event(
-        previous: CodexTaskLogState,
-        current: CodexTaskLogState
-    ) -> CodexTaskStatusSoundEvent? {
-        guard previous == .running else { return nil }
-        switch current {
+struct CodexTaskStatusSoundTracker {
+    private(set) var hasRunningTask = false
+
+    mutating func event(for state: CodexTaskLogState) -> CodexTaskStatusSoundEvent? {
+        switch state {
+        case .running:
+            hasRunningTask = true
+            return nil
+        case .unavailable:
+            // A temporary read gap must not erase a known running task.
+            return nil
         case .idle:
+            guard hasRunningTask else { return nil }
+            hasRunningTask = false
             return .completed
         case .cancelled, .error:
+            guard hasRunningTask else { return nil }
+            hasRunningTask = false
             return .attention
-        case .running, .unavailable:
-            return nil
         }
     }
 }
@@ -101,14 +107,19 @@ struct CodexTaskStatusLogParser {
 
         let length = (try? handle.seekToEnd()) ?? 0
         let cached = cache.entry(for: url)
+        let hasCachedBaseline = cached.map {
+            length >= $0.offset
+        } ?? false
         let canContinue = cached.map {
             length >= $0.offset && length - $0.offset <= maxBytes
         } ?? false
         let readStart: UInt64
         let initialState: CodexTaskLogState
         let initialFailure: Bool
-        if canContinue, let cached {
-            readStart = cached.offset
+        if hasCachedBaseline, let cached {
+            readStart = canContinue
+                ? cached.offset
+                : (length > maxBytes ? length - maxBytes : 0)
             initialState = cached.state
             initialFailure = cached.currentTurnFailed
         } else {
@@ -124,15 +135,15 @@ struct CodexTaskStatusLogParser {
             in: raw,
             droppingLeadingPartialLine: !canContinue && readStart > 0
         )
-        if !canContinue, complete.data.isEmpty, complete.consumedBytes == 0 {
-            return nil
+        if complete.data.isEmpty, complete.consumedBytes == 0 {
+            return hasCachedBaseline ? cached?.state : nil
         }
         let result = parse(
             complete.data,
             initialState: initialState,
             currentTurnFailed: initialFailure
         )
-        if !canContinue, !result.recognizedLifecycle {
+        if !result.recognizedLifecycle, !hasCachedBaseline {
             return nil
         }
         cache.set(

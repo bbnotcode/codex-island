@@ -400,12 +400,18 @@ private struct CompactCodexTaskStatusOverlay: View {
                 if showsDetails {
                     ZStack {
                         HStack(spacing: 0) {
-                            TimelineView(.periodic(from: .now, by: 30)) { context in
-                                Text(elapsedUpdate(at: context.date))
+                            Group {
+                                if store.snapshot.status == .idle {
+                                    Text(Duration.compact(0))
+                                } else {
+                                    TimelineView(.periodic(from: .now, by: 30)) { context in
+                                        Text(elapsedUpdate(at: context.date))
+                                    }
+                                }
+                            }
                                     .font(Typography.bodyNumber)
                                     .foregroundStyle(statusColor)
                                     .frame(width: 44, alignment: .center)
-                            }
 
                             Group {
                                 if store.displayMode == .iconAndText {

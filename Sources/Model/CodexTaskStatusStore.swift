@@ -82,6 +82,7 @@ final class CodexTaskStatusStore: ObservableObject {
     private var activityCancellable: AnyCancellable?
     private var refreshInFlight = false
     private var lastScanFingerprint: String?
+    private var soundTracker = CodexTaskStatusSoundTracker()
 
     private init() {
         enabled = Pref.seededBool(
@@ -183,14 +184,10 @@ final class CodexTaskStatusStore: ObservableObject {
     }
 
     private func apply(_ nextSnapshot: Snapshot) {
-        let previousStatus = logState(for: snapshot.status)
         let nextStatus = logState(for: nextSnapshot.status)
         snapshot = nextSnapshot
-        guard soundEnabled,
-              let event = CodexTaskStatusSoundPolicy.event(
-                previous: previousStatus,
-                current: nextStatus
-              )
+        let event = soundTracker.event(for: nextStatus)
+        guard soundEnabled, let event
         else { return }
         playSound(for: event)
     }

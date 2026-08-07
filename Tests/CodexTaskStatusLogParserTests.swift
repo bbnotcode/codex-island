@@ -113,6 +113,26 @@ struct CodexTaskStatusLogParserTests {
             "unrecognized truncated tail reports unavailable"
         )
 
+        let cachedGrowthGap = directory.appendingPathComponent("rollout-cached-growth-gap.jsonl")
+        try event("task_started").write(to: cachedGrowthGap)
+        expect(
+            CodexTaskStatusLogParser.parse(at: cachedGrowthGap, maxBytes: 128) == .running,
+            "long-running task establishes a cached running state"
+        )
+        try event(
+            "response_item",
+            detail: String(repeating: "x", count: 1024)
+        ).append(to: cachedGrowthGap)
+        expect(
+            CodexTaskStatusLogParser.parse(at: cachedGrowthGap, maxBytes: 128) == .running,
+            "large unrecognized growth preserves the cached running state"
+        )
+        try event("task_complete").append(to: cachedGrowthGap)
+        expect(
+            CodexTaskStatusLogParser.parse(at: cachedGrowthGap, maxBytes: 128) == .idle,
+            "completion after a large growth gap is still detected"
+        )
+
         let now = Date()
         expect(
             CodexTaskStatusPolicy.priority(for: .running, updatedAt: now, now: now)
@@ -128,28 +148,38 @@ struct CodexTaskStatusLogParserTests {
             "stale terminal state decays below idle"
         )
 
+        var completionSounds = CodexTaskStatusSoundTracker()
+        _ = completionSounds.event(for: .running)
         expect(
-            CodexTaskStatusSoundPolicy.event(previous: .running, current: .idle)
-                == .completed,
+            completionSounds.event(for: .idle) == .completed,
             "running to idle emits a completion sound event"
         )
+        var errorSounds = CodexTaskStatusSoundTracker()
+        _ = errorSounds.event(for: .running)
         expect(
-            CodexTaskStatusSoundPolicy.event(previous: .running, current: .error)
-                == .attention,
+            errorSounds.event(for: .error) == .attention,
             "running to error emits an attention sound event"
         )
+        var cancelledSounds = CodexTaskStatusSoundTracker()
+        _ = cancelledSounds.event(for: .running)
         expect(
-            CodexTaskStatusSoundPolicy.event(previous: .running, current: .cancelled)
-                == .attention,
+            cancelledSounds.event(for: .cancelled) == .attention,
             "running to cancelled emits an attention sound event"
         )
+        var startupSounds = CodexTaskStatusSoundTracker()
         expect(
-            CodexTaskStatusSoundPolicy.event(previous: .idle, current: .error) == nil,
+            startupSounds.event(for: .error) == nil,
             "startup and non-running transitions stay silent"
         )
+        var interruptedSounds = CodexTaskStatusSoundTracker()
+        _ = interruptedSounds.event(for: .running)
         expect(
-            CodexTaskStatusSoundPolicy.event(previous: .running, current: .unavailable) == nil,
+            interruptedSounds.event(for: .unavailable) == nil,
             "temporary unavailable state stays silent"
+        )
+        expect(
+            interruptedSounds.event(for: .idle) == .completed,
+            "completion after a temporary unavailable state still emits a sound"
         )
 
         if failures > 0 {
