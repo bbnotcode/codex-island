@@ -262,7 +262,9 @@ final class CodexTaskStatusStore: ObservableObject {
         ) else {
             return ScanResult(
                 fingerprint: "unavailable",
-                snapshot: Snapshot(status: .unavailable, threadID: nil, updatedAt: nil),
+                snapshot: previousFingerprint == "unavailable"
+                    ? nil
+                    : Snapshot(status: .unavailable, threadID: nil, updatedAt: nil),
                 cachedDayDirectories: cachedDayDirectories,
                 lastFullDirectoryScan: lastFullDirectoryScan
             )
