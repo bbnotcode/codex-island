@@ -288,6 +288,23 @@ struct CodexTaskStatusLogParserTests {
             "top-level session metadata remains eligible for notifications"
         )
 
+        var subagentLogs: [URL] = []
+        for index in 0..<30 {
+            let url = directory.appendingPathComponent(
+                "rollout-subagent-\(index).jsonl"
+            )
+            try sessionMeta(subagent: true).write(to: url)
+            subagentLogs.append(url)
+        }
+        let selectedTopLevelFiles = CodexTaskStatusFilePolicy.selectTopLevelFiles(
+            from: subagentLogs + [topLevelLog],
+            maximumCount: 1
+        )
+        expect(
+            selectedTopLevelFiles == [topLevelLog],
+            "subagents do not consume the top-level task file limit"
+        )
+
         if failures > 0 {
             print("\(failures) failure(s)")
             exit(1)

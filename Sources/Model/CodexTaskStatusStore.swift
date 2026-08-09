@@ -88,7 +88,8 @@ final class CodexTaskStatusStore: ObservableObject {
 
     private var timer: Timer?
     private var activityCancellable: AnyCancellable?
-    private var refreshInFlight = false
+    private var refreshInFlightGeneration: UInt64?
+    private var monitoringGeneration: UInt64 = 0
     private var lastScanFingerprint: String?
     private var cachedDayDirectories: [URL] = []
     private var lastFullDirectoryScan: Date?
@@ -131,6 +132,7 @@ final class CodexTaskStatusStore: ObservableObject {
     private func setPollingActive(_ active: Bool) {
         timer?.invalidate()
         timer = nil
+        monitoringGeneration &+= 1
         guard active else {
             hasCompletedInitialScan = false
             monitoringStartedAt = nil
@@ -188,15 +190,24 @@ final class CodexTaskStatusStore: ObservableObject {
     }
 
     private func refresh() {
-        guard isRenderable, !refreshInFlight else { return }
-        refreshInFlight = true
+        let generation = monitoringGeneration
+        guard isRenderable, refreshInFlightGeneration == nil else { return }
+        refreshInFlightGeneration = generation
         let previousFingerprint = lastScanFingerprint
         let cachedDayDirectories = cachedDayDirectories
         let lastFullDirectoryScan = lastFullDirectoryScan
         let monitoringStartedAt = monitoringStartedAt ?? Date()
         Task { [weak self] in
             guard let self else { return }
-            defer { self.refreshInFlight = false }
+            defer {
+                if self.refreshInFlightGeneration == generation {
+                    self.refreshInFlightGeneration = nil
+                    if self.monitoringGeneration != generation,
+                       self.isRenderable {
+                        self.refresh()
+                    }
+                }
+            }
             let result = await Task.detached(priority: .utility) {
                 Self.scan(
                     previousFingerprint: previousFingerprint,
@@ -205,6 +216,8 @@ final class CodexTaskStatusStore: ObservableObject {
                     monitoringStartedAt: monitoringStartedAt
                 )
             }.value
+            guard self.monitoringGeneration == generation,
+                  self.isRenderable else { return }
             self.lastScanFingerprint = result.fingerprint
             self.cachedDayDirectories = result.cachedDayDirectories
             self.lastFullDirectoryScan = result.lastFullDirectoryScan
@@ -214,7 +227,7 @@ final class CodexTaskStatusStore: ObservableObject {
             let shouldPlaySounds = self.hasCompletedInitialScan && self.soundEnabled
             self.hasCompletedInitialScan = true
             if shouldPlaySounds {
-                self.playSounds(result.soundEvents)
+                self.playSounds(result.soundEvents, generation: generation)
             }
         }
     }
@@ -223,12 +236,18 @@ final class CodexTaskStatusStore: ObservableObject {
         snapshot = nextSnapshot
     }
 
-    private func playSounds(_ events: [CodexTaskStatusSoundEvent]) {
+    private func playSounds(
+        _ events: [CodexTaskStatusSoundEvent],
+        generation: UInt64
+    ) {
         for (index, event) in events.enumerated() {
             DispatchQueue.main.asyncAfter(
                 deadline: .now() + Double(index) * 0.45
             ) { [weak self] in
-                guard let self, self.soundEnabled else { return }
+                guard let self,
+                      self.monitoringGeneration == generation,
+                      self.isRenderable,
+                      self.soundEnabled else { return }
                 self.playSound(for: event)
             }
         }
@@ -287,10 +306,8 @@ final class CodexTaskStatusStore: ObservableObject {
                 lastFullDirectoryScan: lastFullDirectoryScan
             )
         }
-        CodexTaskStatusLogParser.retainCache(for: Set(discovery.files))
-        let files = discovery.files.filter {
-            !CodexTaskStatusLogParser.isSubagentSession(at: $0)
-        }
+        let files = discovery.files
+        CodexTaskStatusLogParser.retainCache(for: Set(files))
         let fingerprint = files.map { url in
             let values = try? url.resourceValues(
                 forKeys: [.contentModificationDateKey, .fileSizeKey]
@@ -446,10 +463,13 @@ final class CodexTaskStatusStore: ObservableObject {
                 directoriesWithRecentFiles.insert(dayDirectory)
             }
         }
-        let selectedFiles = files
+        let filesByRecency = files
             .sorted { $0.1 > $1.1 }
-            .prefix(maximumTrackedFiles)
             .map(\.0)
+        let selectedFiles = CodexTaskStatusFilePolicy.selectTopLevelFiles(
+            from: filesByRecency,
+            maximumCount: maximumTrackedFiles
+        )
         return RolloutDiscovery(
             files: selectedFiles,
             cachedDayDirectories: directoriesWithRecentFiles.sorted {
