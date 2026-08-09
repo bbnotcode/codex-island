@@ -1,6 +1,6 @@
 import Foundation
 
-enum CodexTaskLogState: Equatable {
+enum CodexTaskLogState: Equatable, Sendable {
     case running
     case idle
     case cancelled
@@ -8,9 +8,14 @@ enum CodexTaskLogState: Equatable {
     case unavailable
 }
 
-enum CodexTaskStatusSoundEvent: Equatable {
+enum CodexTaskStatusSoundEvent: Equatable, Sendable {
     case completed
     case attention
+}
+
+struct CodexTaskLogParseResult: Equatable, Sendable {
+    let state: CodexTaskLogState
+    let soundEvents: [CodexTaskStatusSoundEvent]
 }
 
 struct CodexTaskStatusSoundTracker {
@@ -120,6 +125,13 @@ struct CodexTaskStatusLogParser {
     }
 
     static func parse(at url: URL, maxBytes: UInt64 = 512 * 1024) -> CodexTaskLogState? {
+        parseUpdate(at: url, maxBytes: maxBytes)?.state
+    }
+
+    static func parseUpdate(
+        at url: URL,
+        maxBytes: UInt64 = 512 * 1024
+    ) -> CodexTaskLogParseResult? {
         guard maxBytes > 0,
               let handle = try? FileHandle(forReadingFrom: url)
         else { return nil }
@@ -156,7 +168,9 @@ struct CodexTaskStatusLogParser {
             droppingLeadingPartialLine: !canContinue && readStart > 0
         )
         if complete.data.isEmpty, complete.consumedBytes == 0 {
-            return hasCachedBaseline ? cached?.state : nil
+            return hasCachedBaseline
+                ? cached.map { CodexTaskLogParseResult(state: $0.state, soundEvents: []) }
+                : nil
         }
         let result = parse(
             complete.data,
@@ -174,7 +188,10 @@ struct CodexTaskStatusLogParser {
             ),
             for: url
         )
-        return result.state
+        return CodexTaskLogParseResult(
+            state: result.state,
+            soundEvents: result.soundEvents
+        )
     }
 
     private static func completeLines(
@@ -204,10 +221,18 @@ struct CodexTaskStatusLogParser {
         _ data: Data,
         initialState: CodexTaskLogState,
         currentTurnFailed initialFailure: Bool
-    ) -> (state: CodexTaskLogState, currentTurnFailed: Bool, recognizedLifecycle: Bool) {
+    ) -> (
+        state: CodexTaskLogState,
+        currentTurnFailed: Bool,
+        recognizedLifecycle: Bool,
+        soundEvents: [CodexTaskStatusSoundEvent]
+    ) {
         var state = initialState
         var currentTurnFailed = initialFailure
         var recognizedLifecycle = false
+        var soundTracker = CodexTaskStatusSoundTracker()
+        var soundEvents: [CodexTaskStatusSoundEvent] = []
+        _ = soundTracker.event(for: initialState)
 
         for line in data.split(separator: newline) {
             guard let event = eventType(in: line) else { continue }
@@ -235,8 +260,11 @@ struct CodexTaskStatusLogParser {
             default:
                 break
             }
+            if let soundEvent = soundTracker.event(for: state) {
+                soundEvents.append(soundEvent)
+            }
         }
-        return (state, currentTurnFailed, recognizedLifecycle)
+        return (state, currentTurnFailed, recognizedLifecycle, soundEvents)
     }
 
     private static func eventType(in line: Data.SubSequence) -> String? {

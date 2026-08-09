@@ -89,7 +89,7 @@ final class CodexTaskStatusStore: ObservableObject {
     private var lastScanFingerprint: String?
     private var cachedDayDirectories: [URL] = []
     private var lastFullDirectoryScan: Date?
-    private var soundTracker = CodexTaskStatusSoundTracker()
+    private var hasCompletedInitialScan = false
 
     private init() {
         enabled = Pref.seededBool(
@@ -199,25 +199,26 @@ final class CodexTaskStatusStore: ObservableObject {
             if let snapshot = result.snapshot {
                 self.apply(snapshot)
             }
+            let shouldPlaySounds = self.hasCompletedInitialScan && self.soundEnabled
+            self.hasCompletedInitialScan = true
+            if shouldPlaySounds {
+                self.playSounds(result.soundEvents)
+            }
         }
     }
 
     private func apply(_ nextSnapshot: Snapshot) {
-        let nextStatus = logState(for: nextSnapshot.status)
         snapshot = nextSnapshot
-        let event = soundTracker.event(for: nextStatus)
-        guard soundEnabled, let event
-        else { return }
-        playSound(for: event)
     }
 
-    private func logState(for status: Status) -> CodexTaskLogState {
-        switch status {
-        case .running: .running
-        case .idle: .idle
-        case .cancelled: .cancelled
-        case .error: .error
-        case .unavailable: .unavailable
+    private func playSounds(_ events: [CodexTaskStatusSoundEvent]) {
+        for (index, event) in events.enumerated() {
+            DispatchQueue.main.asyncAfter(
+                deadline: .now() + Double(index) * 0.45
+            ) { [weak self] in
+                guard let self, self.soundEnabled else { return }
+                self.playSound(for: event)
+            }
         }
     }
 
@@ -239,6 +240,7 @@ final class CodexTaskStatusStore: ObservableObject {
     private struct ScanResult: Sendable {
         let fingerprint: String
         let snapshot: Snapshot?
+        let soundEvents: [CodexTaskStatusSoundEvent]
         let cachedDayDirectories: [URL]
         let lastFullDirectoryScan: Date?
     }
@@ -265,6 +267,7 @@ final class CodexTaskStatusStore: ObservableObject {
                 snapshot: previousFingerprint == "unavailable"
                     ? nil
                     : Snapshot(status: .unavailable, threadID: nil, updatedAt: nil),
+                soundEvents: [],
                 cachedDayDirectories: cachedDayDirectories,
                 lastFullDirectoryScan: lastFullDirectoryScan
             )
@@ -285,6 +288,7 @@ final class CodexTaskStatusStore: ObservableObject {
             return ScanResult(
                 fingerprint: fingerprint,
                 snapshot: nil,
+                soundEvents: [],
                 cachedDayDirectories: discovery.cachedDayDirectories,
                 lastFullDirectoryScan: discovery.lastFullDirectoryScan
             )
@@ -294,12 +298,15 @@ final class CodexTaskStatusStore: ObservableObject {
             return ScanResult(
                 fingerprint: fingerprint,
                 snapshot: Snapshot(status: .idle, threadID: nil, updatedAt: nil),
+                soundEvents: [],
                 cachedDayDirectories: discovery.cachedDayDirectories,
                 lastFullDirectoryScan: discovery.lastFullDirectoryScan
             )
         }
 
-        let states = files.compactMap(parseState)
+        let parsedStates = files.compactMap(parseState)
+        let states = parsedStates.map(\.snapshot)
+        let soundEvents = parsedStates.flatMap(\.soundEvents)
         guard let selected = states.max(by: { lhs, rhs in
             let lhsPriority = selectionPriority(lhs)
             let rhsPriority = selectionPriority(rhs)
@@ -311,6 +318,7 @@ final class CodexTaskStatusStore: ObservableObject {
             return ScanResult(
                 fingerprint: fingerprint,
                 snapshot: Snapshot(status: .unavailable, threadID: nil, updatedAt: nil),
+                soundEvents: soundEvents,
                 cachedDayDirectories: discovery.cachedDayDirectories,
                 lastFullDirectoryScan: discovery.lastFullDirectoryScan
             )
@@ -318,6 +326,7 @@ final class CodexTaskStatusStore: ObservableObject {
         return ScanResult(
             fingerprint: fingerprint,
             snapshot: selected,
+            soundEvents: soundEvents,
             cachedDayDirectories: discovery.cachedDayDirectories,
             lastFullDirectoryScan: discovery.lastFullDirectoryScan
         )
@@ -430,14 +439,19 @@ final class CodexTaskStatusStore: ObservableObject {
         )
     }
 
-    nonisolated private static func parseState(at url: URL) -> Snapshot? {
-        guard let parsed = CodexTaskStatusLogParser.parse(at: url),
+    private struct ParsedSnapshot: Sendable {
+        let snapshot: Snapshot
+        let soundEvents: [CodexTaskStatusSoundEvent]
+    }
+
+    nonisolated private static func parseState(at url: URL) -> ParsedSnapshot? {
+        guard let parsed = CodexTaskStatusLogParser.parseUpdate(at: url),
               let modified = try? url.resourceValues(
                 forKeys: [.contentModificationDateKey]
               ).contentModificationDate
         else { return nil }
 
-        let status: Status = switch parsed {
+        let status: Status = switch parsed.state {
         case .running: .running
         case .idle: .idle
         case .cancelled: .cancelled
@@ -445,10 +459,13 @@ final class CodexTaskStatusStore: ObservableObject {
         case .unavailable: .unavailable
         }
 
-        return Snapshot(
-            status: status,
-            threadID: threadID(from: url),
-            updatedAt: modified
+        return ParsedSnapshot(
+            snapshot: Snapshot(
+                status: status,
+                threadID: threadID(from: url),
+                updatedAt: modified
+            ),
+            soundEvents: parsed.soundEvents
         )
     }
 
