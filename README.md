@@ -206,6 +206,13 @@ current rollout files do not expose a reliable event for that state. The
 feature is off by default, polls only while enabled with Claude hidden and
 Codex visible, and never displays prompts, commands, or output.
 
+Optional status sounds are event-specific: completion uses Glass, approval
+uses Ping, cancellation uses Funk, and errors use Basso. Notifications are
+emitted only for top-level sessions; Codex guardian/subagent rollouts are
+excluded so internal work cannot produce a false completion alert. Monitoring
+generations also prevent an old scan or queued sound from leaking across a
+provider or setting change.
+
 The compact and peek views are visual-only so their normal click-to-expand
 behavior is preserved. The expanded status card can open the related task in
 the Codex app when available. Disable the feature at any time to restore the

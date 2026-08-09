@@ -539,7 +539,7 @@ struct SettingsView: View {
             .opacity(codexTaskStatus.enabled ? 1 : 0.4)
             SettingsRow(
                 title: "Status sounds",
-                subtitle: "Play a sound when a running task completes, is cancelled, or fails."
+                subtitle: "Use distinct sounds for completion, approval, cancellation, and errors."
             ) {
                 SettingsToggle(isOn: codexTaskStatus.soundEnabled) {
                     codexTaskStatus.soundEnabled.toggle()

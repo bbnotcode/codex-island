@@ -126,6 +126,7 @@
 "Updated %@" = "更新于%@";
 "Status sounds" = "状态提示音";
 "Play a sound when a running task completes, is cancelled, or fails." = "运行中的任务完成、取消或失败时播放提示音。";
+"Use distinct sounds for completion, approval, cancellation, and errors." = "任务完成、等待审批、取消和报错时使用不同的提示音。";
 "Show on" = "显示在";
 "Sparkline" = "折线";
 "Spacing" = "间距";
