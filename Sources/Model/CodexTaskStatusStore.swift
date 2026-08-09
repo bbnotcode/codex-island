@@ -28,6 +28,7 @@ final class CodexTaskStatusStore: ObservableObject {
 
     enum Status: String, CaseIterable, Sendable {
         case running
+        case waitingApproval
         case idle
         case cancelled
         case error
@@ -36,6 +37,7 @@ final class CodexTaskStatusStore: ObservableObject {
         var label: String {
             switch self {
             case .running: "Running"
+            case .waitingApproval: "Waiting for approval"
             case .idle: "Idle"
             case .cancelled: "Cancelled"
             case .error: "Error"
@@ -46,6 +48,7 @@ final class CodexTaskStatusStore: ObservableObject {
         var compactLabel: String {
             switch self {
             case .running: "Running short"
+            case .waitingApproval: "Approval short"
             case .idle: "Idle"
             case .cancelled: "Cancelled short"
             case .error: "Error"
@@ -90,6 +93,7 @@ final class CodexTaskStatusStore: ObservableObject {
     private var cachedDayDirectories: [URL] = []
     private var lastFullDirectoryScan: Date?
     private var hasCompletedInitialScan = false
+    private var monitoringStartedAt: Date?
 
     private init() {
         enabled = Pref.seededBool(
@@ -127,7 +131,13 @@ final class CodexTaskStatusStore: ObservableObject {
     private func setPollingActive(_ active: Bool) {
         timer?.invalidate()
         timer = nil
-        guard active else { return }
+        guard active else {
+            hasCompletedInitialScan = false
+            monitoringStartedAt = nil
+            return
+        }
+        hasCompletedInitialScan = false
+        monitoringStartedAt = Date()
         refresh()
         timer = Timer.scheduledTimer(
             withTimeInterval: Self.pollingInterval,
@@ -183,6 +193,7 @@ final class CodexTaskStatusStore: ObservableObject {
         let previousFingerprint = lastScanFingerprint
         let cachedDayDirectories = cachedDayDirectories
         let lastFullDirectoryScan = lastFullDirectoryScan
+        let monitoringStartedAt = monitoringStartedAt ?? Date()
         Task { [weak self] in
             guard let self else { return }
             defer { self.refreshInFlight = false }
@@ -190,7 +201,8 @@ final class CodexTaskStatusStore: ObservableObject {
                 Self.scan(
                     previousFingerprint: previousFingerprint,
                     cachedDayDirectories: cachedDayDirectories,
-                    lastFullDirectoryScan: lastFullDirectoryScan
+                    lastFullDirectoryScan: lastFullDirectoryScan,
+                    monitoringStartedAt: monitoringStartedAt
                 )
             }.value
             self.lastScanFingerprint = result.fingerprint
@@ -225,7 +237,9 @@ final class CodexTaskStatusStore: ObservableObject {
     private func playSound(for event: CodexTaskStatusSoundEvent) {
         let name = switch event {
         case .completed: "Glass"
-        case .attention: "Basso"
+        case .error: "Basso"
+        case .cancelled: "Funk"
+        case .approvalRequired: "Ping"
         }
         if NSSound(named: NSSound.Name(name))?.play() != true {
             NSSound.beep()
@@ -254,7 +268,8 @@ final class CodexTaskStatusStore: ObservableObject {
     nonisolated private static func scan(
         previousFingerprint: String?,
         cachedDayDirectories: [URL],
-        lastFullDirectoryScan: Date?
+        lastFullDirectoryScan: Date?,
+        monitoringStartedAt: Date
     ) -> ScanResult {
         let now = Date()
         guard let discovery = recentRolloutFiles(
@@ -272,8 +287,10 @@ final class CodexTaskStatusStore: ObservableObject {
                 lastFullDirectoryScan: lastFullDirectoryScan
             )
         }
-        let files = discovery.files
-        CodexTaskStatusLogParser.retainCache(for: Set(files))
+        CodexTaskStatusLogParser.retainCache(for: Set(discovery.files))
+        let files = discovery.files.filter {
+            !CodexTaskStatusLogParser.isSubagentSession(at: $0)
+        }
         let fingerprint = files.map { url in
             let values = try? url.resourceValues(
                 forKeys: [.contentModificationDateKey, .fileSizeKey]
@@ -304,7 +321,9 @@ final class CodexTaskStatusStore: ObservableObject {
             )
         }
 
-        let parsedStates = files.compactMap(parseState)
+        let parsedStates = files.compactMap {
+            parseState(at: $0, monitoringStartedAt: monitoringStartedAt)
+        }
         let states = parsedStates.map(\.snapshot)
         let soundEvents = parsedStates.flatMap(\.soundEvents)
         guard let selected = states.max(by: { lhs, rhs in
@@ -335,6 +354,7 @@ final class CodexTaskStatusStore: ObservableObject {
     nonisolated private static func selectionPriority(_ snapshot: Snapshot) -> Int {
         let state: CodexTaskLogState = switch snapshot.status {
         case .running: .running
+        case .waitingApproval: .waitingApproval
         case .idle: .idle
         case .cancelled: .cancelled
         case .error: .error
@@ -444,7 +464,10 @@ final class CodexTaskStatusStore: ObservableObject {
         let soundEvents: [CodexTaskStatusSoundEvent]
     }
 
-    nonisolated private static func parseState(at url: URL) -> ParsedSnapshot? {
+    nonisolated private static func parseState(
+        at url: URL,
+        monitoringStartedAt: Date
+    ) -> ParsedSnapshot? {
         guard let parsed = CodexTaskStatusLogParser.parseUpdate(at: url),
               let modified = try? url.resourceValues(
                 forKeys: [.contentModificationDateKey]
@@ -453,11 +476,19 @@ final class CodexTaskStatusStore: ObservableObject {
 
         let status: Status = switch parsed.state {
         case .running: .running
+        case .waitingApproval: .waitingApproval
         case .idle: .idle
         case .cancelled: .cancelled
         case .error: .error
         case .unavailable: .unavailable
         }
+
+        let mayNotifyFromInitialRead = modified >= monitoringStartedAt
+            && status != .running
+            && status != .unavailable
+        let soundEvents = parsed.isInitialRead
+            ? (mayNotifyFromInitialRead ? Array(parsed.soundEvents.suffix(1)) : [])
+            : parsed.soundEvents
 
         return ParsedSnapshot(
             snapshot: Snapshot(
@@ -465,7 +496,7 @@ final class CodexTaskStatusStore: ObservableObject {
                 threadID: threadID(from: url),
                 updatedAt: modified
             ),
-            soundEvents: parsed.soundEvents
+            soundEvents: soundEvents
         )
     }
 

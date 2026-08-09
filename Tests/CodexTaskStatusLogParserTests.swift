@@ -22,6 +22,41 @@ struct CodexTaskStatusLogParserTests {
         return data + Data([0x0A])
     }
 
+    static func responseItem(_ payload: [String: Any]) -> Data {
+        let data = try! JSONSerialization.data(withJSONObject: [
+            "type": "response_item",
+            "payload": payload,
+        ])
+        return data + Data([0x0A])
+    }
+
+    static func permissionRequest(_ callID: String) -> Data {
+        responseItem([
+            "type": "function_call",
+            "name": "request_permissions",
+            "call_id": callID,
+        ])
+    }
+
+    static func functionOutput(_ callID: String) -> Data {
+        responseItem([
+            "type": "function_call_output",
+            "call_id": callID,
+            "output": "approved",
+        ])
+    }
+
+    static func sessionMeta(subagent: Bool) -> Data {
+        let source: Any = subagent
+            ? ["subagent": ["other": "guardian"]]
+            : "vscode"
+        let data = try! JSONSerialization.data(withJSONObject: [
+            "type": "session_meta",
+            "payload": ["source": source],
+        ])
+        return data + Data([0x0A])
+    }
+
     static func main() throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString)
@@ -174,40 +209,6 @@ struct CodexTaskStatusLogParserTests {
             "rollout directory components use the UTC date"
         )
 
-        var completionSounds = CodexTaskStatusSoundTracker()
-        _ = completionSounds.event(for: .running)
-        expect(
-            completionSounds.event(for: .idle) == .completed,
-            "running to idle emits a completion sound event"
-        )
-        var errorSounds = CodexTaskStatusSoundTracker()
-        _ = errorSounds.event(for: .running)
-        expect(
-            errorSounds.event(for: .error) == .attention,
-            "running to error emits an attention sound event"
-        )
-        var cancelledSounds = CodexTaskStatusSoundTracker()
-        _ = cancelledSounds.event(for: .running)
-        expect(
-            cancelledSounds.event(for: .cancelled) == .attention,
-            "running to cancelled emits an attention sound event"
-        )
-        var startupSounds = CodexTaskStatusSoundTracker()
-        expect(
-            startupSounds.event(for: .error) == nil,
-            "startup and non-running transitions stay silent"
-        )
-        var interruptedSounds = CodexTaskStatusSoundTracker()
-        _ = interruptedSounds.event(for: .running)
-        expect(
-            interruptedSounds.event(for: .unavailable) == nil,
-            "temporary unavailable state stays silent"
-        )
-        expect(
-            interruptedSounds.event(for: .idle) == .completed,
-            "completion after a temporary unavailable state still emits a sound"
-        )
-
         let shortTask = directory.appendingPathComponent("rollout-short-task.jsonl")
         var shortTaskData = event("task_started")
         shortTaskData.append(event("task_complete"))
@@ -236,8 +237,55 @@ struct CodexTaskStatusLogParserTests {
         try parallelTaskData.write(to: parallelTask)
         expect(
             CodexTaskStatusLogParser.parseUpdate(at: parallelTask)?.soundEvents
-                == [.attention],
+                == [.cancelled],
             "each independently parsed task emits its own terminal event"
+        )
+
+        let errorTask = directory.appendingPathComponent("rollout-error-task.jsonl")
+        var errorTaskData = event("task_started")
+        errorTaskData.append(event("stream_error"))
+        errorTaskData.append(event("task_complete"))
+        try errorTaskData.write(to: errorTask)
+        expect(
+            CodexTaskStatusLogParser.parseUpdate(at: errorTask)?.soundEvents == [.error],
+            "error emits its own sound event without a completion event"
+        )
+
+        let approvalTask = directory.appendingPathComponent("rollout-approval-task.jsonl")
+        let approvalCallID = "call-approval"
+        var approvalData = event("task_started")
+        approvalData.append(permissionRequest(approvalCallID))
+        approvalData.append(event("task_complete"))
+        try approvalData.write(to: approvalTask)
+        let approvalResult = CodexTaskStatusLogParser.parseUpdate(at: approvalTask)
+        expect(
+            approvalResult?.state == .waitingApproval
+                && approvalResult?.soundEvents == [.approvalRequired],
+            "unresolved permission request waits for approval without completion sound"
+        )
+        try functionOutput(approvalCallID).append(to: approvalTask)
+        let approvedResult = CodexTaskStatusLogParser.parseUpdate(at: approvalTask)
+        expect(
+            approvedResult?.state == .running
+                && approvedResult?.soundEvents.isEmpty == true,
+            "permission output resumes running without another alert"
+        )
+
+        let subagentLog = directory.appendingPathComponent("rollout-subagent.jsonl")
+        var subagentData = sessionMeta(subagent: true)
+        subagentData.append(event("task_started"))
+        subagentData.append(event("task_complete"))
+        try subagentData.write(to: subagentLog)
+        expect(
+            CodexTaskStatusLogParser.isSubagentSession(at: subagentLog),
+            "subagent session metadata is detected for notification filtering"
+        )
+
+        let topLevelLog = directory.appendingPathComponent("rollout-top-level.jsonl")
+        try sessionMeta(subagent: false).write(to: topLevelLog)
+        expect(
+            !CodexTaskStatusLogParser.isSubagentSession(at: topLevelLog),
+            "top-level session metadata remains eligible for notifications"
         )
 
         if failures > 0 {

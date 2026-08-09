@@ -199,9 +199,10 @@ changing the app language offers to restart CodexIsland.
 
 Codex task status is inferred locally from recent
 `~/.codex/sessions/**/*.jsonl` rollout lifecycle events. It reports only the
-states the current rollout format can support reliably: running, idle,
-cancelled, error, or unavailable. Approval and user-input waits are not claimed
-because current rollout files do not record those app-server events. The
+states the current rollout format can support reliably: running, waiting for
+approval, idle, cancelled, error, or unavailable. Approval is detected from an
+unresolved `request_permissions` call. User-input waits are not claimed because
+current rollout files do not expose a reliable event for that state. The
 feature is off by default, polls only while enabled with Claude hidden and
 Codex visible, and never displays prompts, commands, or output.
 

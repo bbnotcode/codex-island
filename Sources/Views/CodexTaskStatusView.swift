@@ -131,6 +131,7 @@ struct CodexTaskStatusGlyph: View {
     static func color(for status: CodexTaskStatusStore.Status) -> Color {
         switch status {
         case .running: Color(red: 0.30, green: 0.70, blue: 1.0)
+        case .waitingApproval: Color(red: 1.0, green: 0.72, blue: 0.24)
         case .idle: Color(red: 0.48, green: 0.78, blue: 1.0)
         case .cancelled: Color(red: 0.72, green: 0.62, blue: 0.48)
         case .error: Color(red: 1.0, green: 0.34, blue: 0.34)
@@ -143,6 +144,7 @@ struct CodexTaskStatusGlyph: View {
     private var icon: String {
         switch status {
         case .running: "bolt.fill"
+        case .waitingApproval: "hand.raised.fill"
         case .idle: "moon.zzz.fill"
         case .cancelled: "xmark.circle.fill"
         case .error: "exclamationmark.triangle.fill"

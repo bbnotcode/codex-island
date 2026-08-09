@@ -104,6 +104,8 @@
 "Show local Codex task state when the Claude side is hidden." = "隐藏 Claude 一侧时显示本地 Codex 任务状态。";
 "Running" = "运行中";
 "Running short" = "运行";
+"Waiting for approval" = "等待审批";
+"Approval short" = "审批";
 "Idle" = "空闲";
 "Cancelled" = "已取消";
 "Cancelled short" = "取消";

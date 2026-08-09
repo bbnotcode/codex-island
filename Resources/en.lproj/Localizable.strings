@@ -104,6 +104,8 @@
 "Show local Codex task state when the Claude side is hidden." = "Show local Codex task state when the Claude side is hidden.";
 "Running" = "Running";
 "Running short" = "Running";
+"Waiting for approval" = "Waiting for approval";
+"Approval short" = "Approval";
 "Idle" = "Idle";
 "Cancelled" = "Cancelled";
 "Cancelled short" = "Cancelled";
