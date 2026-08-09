@@ -2,6 +2,7 @@ import Foundation
 
 enum CodexTaskLogState: Equatable, Sendable {
     case running
+    case waitingApproval
     case idle
     case cancelled
     case error
@@ -10,35 +11,15 @@ enum CodexTaskLogState: Equatable, Sendable {
 
 enum CodexTaskStatusSoundEvent: Equatable, Sendable {
     case completed
-    case attention
+    case error
+    case cancelled
+    case approvalRequired
 }
 
 struct CodexTaskLogParseResult: Equatable, Sendable {
     let state: CodexTaskLogState
     let soundEvents: [CodexTaskStatusSoundEvent]
-}
-
-struct CodexTaskStatusSoundTracker {
-    private(set) var hasRunningTask = false
-
-    mutating func event(for state: CodexTaskLogState) -> CodexTaskStatusSoundEvent? {
-        switch state {
-        case .running:
-            hasRunningTask = true
-            return nil
-        case .unavailable:
-            // A temporary read gap must not erase a known running task.
-            return nil
-        case .idle:
-            guard hasRunningTask else { return nil }
-            hasRunningTask = false
-            return .completed
-        case .cancelled, .error:
-            guard hasRunningTask else { return nil }
-            hasRunningTask = false
-            return .attention
-        }
-    }
+    let isInitialRead: Bool
 }
 
 enum CodexTaskStatusPolicy {
@@ -59,6 +40,7 @@ enum CodexTaskStatusPolicy {
             return 0
         }
         switch state {
+        case .waitingApproval: return 6
         case .running: return 5
         case .error: return 3
         case .cancelled: return 2
@@ -90,16 +72,20 @@ struct CodexTaskStatusLogParser {
         "error", "stream_error", "exec_command_end", "patch_apply_end",
         "mcp_tool_call_end",
     ].map { Data("\"\($0)\"".utf8) }
+    private static let permissionRequestMarker = Data("\"request_permissions\"".utf8)
+    private static let functionOutputMarker = Data("\"function_call_output\"".utf8)
 
     private struct CacheEntry {
         let offset: UInt64
         let state: CodexTaskLogState
         let currentTurnFailed: Bool
+        let pendingPermissionCallIDs: Set<String>
     }
 
     private final class StateCache: @unchecked Sendable {
         private let lock = NSLock()
         private var entries: [URL: CacheEntry] = [:]
+        private var subagentSessions: [URL: Bool] = [:]
 
         func entry(for url: URL) -> CacheEntry? {
             lock.lock()
@@ -117,11 +103,47 @@ struct CodexTaskStatusLogParser {
             lock.lock()
             defer { lock.unlock() }
             entries = entries.filter { urls.contains($0.key) }
+            subagentSessions = subagentSessions.filter { urls.contains($0.key) }
+        }
+
+        func subagentSession(for url: URL) -> Bool? {
+            lock.lock()
+            defer { lock.unlock() }
+            return subagentSessions[url]
+        }
+
+        func setSubagentSession(_ isSubagent: Bool, for url: URL) {
+            lock.lock()
+            defer { lock.unlock() }
+            subagentSessions[url] = isSubagent
         }
     }
 
     static func retainCache(for urls: Set<URL>) {
         cache.retain(urls: urls)
+    }
+
+    static func isSubagentSession(at url: URL, maxBytes: Int = 64 * 1024) -> Bool {
+        if let cached = cache.subagentSession(for: url) { return cached }
+        guard maxBytes > 0,
+              let handle = try? FileHandle(forReadingFrom: url),
+              let data = try? handle.read(upToCount: maxBytes)
+        else { return false }
+        try? handle.close()
+
+        for line in data.split(separator: newline) {
+            guard let raw = try? JSONSerialization.jsonObject(
+                with: Data(line)
+            ) as? [String: Any],
+                (raw["type"] as? String) == "session_meta",
+                let payload = raw["payload"] as? [String: Any]
+            else { continue }
+            let source = payload["source"] as? [String: Any]
+            let isSubagent = source?["subagent"] != nil
+            cache.setSubagentSession(isSubagent, for: url)
+            return isSubagent
+        }
+        return false
     }
 
     static func parse(at url: URL, maxBytes: UInt64 = 512 * 1024) -> CodexTaskLogState? {
@@ -148,16 +170,19 @@ struct CodexTaskStatusLogParser {
         let readStart: UInt64
         let initialState: CodexTaskLogState
         let initialFailure: Bool
+        let initialPendingPermissionCallIDs: Set<String>
         if hasCachedBaseline, let cached {
             readStart = canContinue
                 ? cached.offset
                 : (length > maxBytes ? length - maxBytes : 0)
             initialState = cached.state
             initialFailure = cached.currentTurnFailed
+            initialPendingPermissionCallIDs = cached.pendingPermissionCallIDs
         } else {
             readStart = length > maxBytes ? length - maxBytes : 0
             initialState = .idle
             initialFailure = false
+            initialPendingPermissionCallIDs = []
         }
 
         try? handle.seek(toOffset: readStart)
@@ -169,13 +194,20 @@ struct CodexTaskStatusLogParser {
         )
         if complete.data.isEmpty, complete.consumedBytes == 0 {
             return hasCachedBaseline
-                ? cached.map { CodexTaskLogParseResult(state: $0.state, soundEvents: []) }
+                ? cached.map {
+                    CodexTaskLogParseResult(
+                        state: $0.state,
+                        soundEvents: [],
+                        isInitialRead: false
+                    )
+                }
                 : nil
         }
         let result = parse(
             complete.data,
             initialState: initialState,
-            currentTurnFailed: initialFailure
+            currentTurnFailed: initialFailure,
+            pendingPermissionCallIDs: initialPendingPermissionCallIDs
         )
         if !result.recognizedLifecycle, !hasCachedBaseline {
             return nil
@@ -184,13 +216,15 @@ struct CodexTaskStatusLogParser {
             CacheEntry(
                 offset: readStart + UInt64(complete.consumedBytes),
                 state: result.state,
-                currentTurnFailed: result.currentTurnFailed
+                currentTurnFailed: result.currentTurnFailed,
+                pendingPermissionCallIDs: result.pendingPermissionCallIDs
             ),
             for: url
         )
         return CodexTaskLogParseResult(
             state: result.state,
-            soundEvents: result.soundEvents
+            soundEvents: result.soundEvents,
+            isInitialRead: !hasCachedBaseline
         )
     }
 
@@ -220,62 +254,123 @@ struct CodexTaskStatusLogParser {
     private static func parse(
         _ data: Data,
         initialState: CodexTaskLogState,
-        currentTurnFailed initialFailure: Bool
+        currentTurnFailed initialFailure: Bool,
+        pendingPermissionCallIDs initialPendingPermissionCallIDs: Set<String>
     ) -> (
         state: CodexTaskLogState,
         currentTurnFailed: Bool,
         recognizedLifecycle: Bool,
-        soundEvents: [CodexTaskStatusSoundEvent]
+        soundEvents: [CodexTaskStatusSoundEvent],
+        pendingPermissionCallIDs: Set<String>
     ) {
         var state = initialState
         var currentTurnFailed = initialFailure
+        var pendingPermissionCallIDs = initialPendingPermissionCallIDs
         var recognizedLifecycle = false
-        var soundTracker = CodexTaskStatusSoundTracker()
         var soundEvents: [CodexTaskStatusSoundEvent] = []
-        _ = soundTracker.event(for: initialState)
 
         for line in data.split(separator: newline) {
-            guard let event = eventType(in: line) else { continue }
+            guard let event = parsedEvent(
+                in: line,
+                expectsPermissionOutput: !pendingPermissionCallIDs.isEmpty
+            ) else { continue }
             switch event {
-            case "task_started", "user_message":
+            case .lifecycle("task_started"), .lifecycle("user_message"):
                 recognizedLifecycle = true
                 currentTurnFailed = false
+                pendingPermissionCallIDs.removeAll()
                 state = .running
-            case "exec_command_end", "patch_apply_end", "mcp_tool_call_end":
+            case .lifecycle("exec_command_end"),
+                 .lifecycle("patch_apply_end"),
+                 .lifecycle("mcp_tool_call_end"):
                 recognizedLifecycle = true
-                if !currentTurnFailed {
+                if !currentTurnFailed && pendingPermissionCallIDs.isEmpty {
                     state = .running
                 }
-            case "task_complete":
+            case .lifecycle("task_complete"):
                 recognizedLifecycle = true
-                state = currentTurnFailed ? .error : .idle
-            case "turn_aborted":
+                if !pendingPermissionCallIDs.isEmpty {
+                    state = .waitingApproval
+                } else if currentTurnFailed {
+                    state = .error
+                } else {
+                    state = .idle
+                    soundEvents.append(.completed)
+                }
+            case .lifecycle("turn_aborted"):
                 recognizedLifecycle = true
                 currentTurnFailed = false
+                pendingPermissionCallIDs.removeAll()
                 state = .cancelled
-            case "error", "stream_error":
+                soundEvents.append(.cancelled)
+            case .lifecycle("error"), .lifecycle("stream_error"):
                 recognizedLifecycle = true
+                if !currentTurnFailed {
+                    soundEvents.append(.error)
+                }
                 currentTurnFailed = true
+                pendingPermissionCallIDs.removeAll()
                 state = .error
+            case let .permissionRequested(callID):
+                recognizedLifecycle = true
+                if pendingPermissionCallIDs.insert(callID).inserted {
+                    soundEvents.append(.approvalRequired)
+                }
+                state = .waitingApproval
+            case let .permissionResolved(callID):
+                guard pendingPermissionCallIDs.remove(callID) != nil else { continue }
+                recognizedLifecycle = true
+                if pendingPermissionCallIDs.isEmpty {
+                    state = currentTurnFailed ? .error : .running
+                }
             default:
                 break
             }
-            if let soundEvent = soundTracker.event(for: state) {
-                soundEvents.append(soundEvent)
-            }
         }
-        return (state, currentTurnFailed, recognizedLifecycle, soundEvents)
+        return (
+            state,
+            currentTurnFailed,
+            recognizedLifecycle,
+            soundEvents,
+            pendingPermissionCallIDs
+        )
     }
 
-    private static func eventType(in line: Data.SubSequence) -> String? {
+    private enum ParsedEvent {
+        case lifecycle(String)
+        case permissionRequested(String)
+        case permissionResolved(String)
+    }
+
+    private static func parsedEvent(
+        in line: Data.SubSequence,
+        expectsPermissionOutput: Bool
+    ) -> ParsedEvent? {
         guard line.count < 1_048_576,
-              lifecycleMarkers.contains(where: { line.range(of: $0) != nil }),
+              lifecycleMarkers.contains(where: { line.range(of: $0) != nil })
+                || line.range(of: permissionRequestMarker) != nil
+                || (expectsPermissionOutput && line.range(of: functionOutputMarker) != nil),
               let raw = try? JSONSerialization.jsonObject(
                 with: Data(line)
               ) as? [String: Any],
-              (raw["type"] as? String) == "event_msg",
               let payload = raw["payload"] as? [String: Any]
         else { return nil }
-        return payload["type"] as? String
+
+        if (raw["type"] as? String) == "event_msg",
+           let type = payload["type"] as? String {
+            return .lifecycle(type)
+        }
+        guard (raw["type"] as? String) == "response_item",
+              let type = payload["type"] as? String,
+              let callID = payload["call_id"] as? String
+        else { return nil }
+        if type == "function_call",
+           (payload["name"] as? String) == "request_permissions" {
+            return .permissionRequested(callID)
+        }
+        if type == "function_call_output", expectsPermissionOutput {
+            return .permissionResolved(callID)
+        }
+        return nil
     }
 }
