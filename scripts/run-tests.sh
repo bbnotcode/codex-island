@@ -49,16 +49,6 @@ swiftc \
 
 swiftc \
   -parse-as-library \
-  -o "$OUT_DIR/pricing-tests" \
-  Sources/Cost/TokenEvent.swift \
-  Sources/Cost/PricingCatalog.swift \
-  Sources/Cost/Pricing.swift \
-  Tests/PricingTests.swift
-
-"$OUT_DIR/pricing-tests"
-
-swiftc \
-  -parse-as-library \
   -o "$OUT_DIR/pricing-catalog-tests" \
   Sources/Cost/PricingCatalog.swift \
   Tests/PricingCatalogTests.swift

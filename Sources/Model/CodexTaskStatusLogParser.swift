@@ -22,6 +22,18 @@ struct CodexTaskLogParseResult: Equatable, Sendable {
     let isInitialRead: Bool
 }
 
+enum CodexTaskStatusFilePolicy {
+    static func selectTopLevelFiles(
+        from filesByRecency: [URL],
+        maximumCount: Int
+    ) -> [URL] {
+        guard maximumCount > 0 else { return [] }
+        return Array(filesByRecency.lazy.filter {
+            !CodexTaskStatusLogParser.isSubagentSession(at: $0)
+        }.prefix(maximumCount))
+    }
+}
+
 enum CodexTaskStatusPolicy {
     static let terminalDecayInterval: TimeInterval = 10 * 60
 
