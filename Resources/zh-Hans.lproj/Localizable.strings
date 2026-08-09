@@ -23,11 +23,11 @@
 "5h" = "5小时";
 "5-hour" = "5 小时";
 "weekly" = "每周";
-"%@: no data for %@ window" = "%@：%@窗口暂无数据";
-"%@: %d percent of %@ window remaining" = "%@：%@窗口剩余 %d%%";
-"%@: %d percent of %@ window remaining, %@" = "%@：%@窗口剩余 %d%%，%@";
-"%@: %d percent of %@ window used" = "%@：已使用%@窗口的 %d%%";
-"%@: %d percent of %@ window used, %@" = "%@：已使用%@窗口的 %d%%，%@";
+"%@: no data for %@ window" = "%1$@：%2$@窗口暂无数据";
+"%@: %d percent of %@ window remaining" = "%1$@：%3$@窗口剩余 %2$d%%";
+"%@: %d percent of %@ window remaining, %@" = "%1$@：%3$@窗口剩余 %2$d%%，%4$@";
+"%@: %d percent of %@ window used" = "%1$@：已使用%3$@窗口的 %2$d%%";
+"%@: %d percent of %@ window used, %@" = "%1$@：已使用%3$@窗口的 %2$d%%，%4$@";
 "All tokens" = "全部 token";
 "All Tokens" = "全部 Token";
 "TOTAL" = "总计";
