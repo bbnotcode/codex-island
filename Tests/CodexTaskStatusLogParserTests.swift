@@ -208,6 +208,38 @@ struct CodexTaskStatusLogParserTests {
             "completion after a temporary unavailable state still emits a sound"
         )
 
+        let shortTask = directory.appendingPathComponent("rollout-short-task.jsonl")
+        var shortTaskData = event("task_started")
+        shortTaskData.append(event("task_complete"))
+        try shortTaskData.write(to: shortTask)
+        let shortTaskResult = CodexTaskStatusLogParser.parseUpdate(at: shortTask)
+        expect(
+            shortTaskResult?.state == .idle
+                && shortTaskResult?.soundEvents == [.completed],
+            "short task completed between polls still emits a completion event"
+        )
+
+        let incrementalTask = directory.appendingPathComponent("rollout-incremental-task.jsonl")
+        try event("task_started").write(to: incrementalTask)
+        let startedResult = CodexTaskStatusLogParser.parseUpdate(at: incrementalTask)
+        try event("task_complete").append(to: incrementalTask)
+        let completedResult = CodexTaskStatusLogParser.parseUpdate(at: incrementalTask)
+        expect(
+            startedResult?.soundEvents.isEmpty == true
+                && completedResult?.soundEvents == [.completed],
+            "incremental task completion emits exactly one completion event"
+        )
+
+        let parallelTask = directory.appendingPathComponent("rollout-parallel-task.jsonl")
+        var parallelTaskData = event("task_started")
+        parallelTaskData.append(event("turn_aborted"))
+        try parallelTaskData.write(to: parallelTask)
+        expect(
+            CodexTaskStatusLogParser.parseUpdate(at: parallelTask)?.soundEvents
+                == [.attention],
+            "each independently parsed task emits its own terminal event"
+        )
+
         if failures > 0 {
             print("\(failures) failure(s)")
             exit(1)
