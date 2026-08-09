@@ -18,6 +18,7 @@ enum CodexTaskStatusSoundEvent: Equatable, Sendable {
 
 struct CodexTaskLogParseResult: Equatable, Sendable {
     let state: CodexTaskLogState
+    let startedAt: Date?
     let soundEvents: [CodexTaskStatusSoundEvent]
     let isInitialRead: Bool
 }
@@ -39,6 +40,10 @@ enum CodexTaskStatusPolicy {
 
     static func isPastTerminalDecay(updatedAt: Date, now: Date = Date()) -> Bool {
         now.timeIntervalSince(updatedAt) > terminalDecayInterval
+    }
+
+    static func earliestActiveStart(in dates: [Date?]) -> Date? {
+        dates.compactMap { $0 }.min()
     }
 
     static func priority(
@@ -90,6 +95,7 @@ struct CodexTaskStatusLogParser {
     private struct CacheEntry {
         let offset: UInt64
         let state: CodexTaskLogState
+        let startedAt: Date?
         let currentTurnFailed: Bool
         let pendingPermissionCallIDs: Set<String>
     }
@@ -181,6 +187,7 @@ struct CodexTaskStatusLogParser {
         } ?? false
         let readStart: UInt64
         let initialState: CodexTaskLogState
+        let initialStartedAt: Date?
         let initialFailure: Bool
         let initialPendingPermissionCallIDs: Set<String>
         if hasCachedBaseline, let cached {
@@ -188,11 +195,13 @@ struct CodexTaskStatusLogParser {
                 ? cached.offset
                 : (length > maxBytes ? length - maxBytes : 0)
             initialState = cached.state
+            initialStartedAt = cached.startedAt
             initialFailure = cached.currentTurnFailed
             initialPendingPermissionCallIDs = cached.pendingPermissionCallIDs
         } else {
             readStart = length > maxBytes ? length - maxBytes : 0
             initialState = .idle
+            initialStartedAt = nil
             initialFailure = false
             initialPendingPermissionCallIDs = []
         }
@@ -209,6 +218,7 @@ struct CodexTaskStatusLogParser {
                 ? cached.map {
                     CodexTaskLogParseResult(
                         state: $0.state,
+                        startedAt: $0.startedAt,
                         soundEvents: [],
                         isInitialRead: false
                     )
@@ -218,6 +228,7 @@ struct CodexTaskStatusLogParser {
         let result = parse(
             complete.data,
             initialState: initialState,
+            startedAt: initialStartedAt,
             currentTurnFailed: initialFailure,
             pendingPermissionCallIDs: initialPendingPermissionCallIDs
         )
@@ -228,6 +239,7 @@ struct CodexTaskStatusLogParser {
             CacheEntry(
                 offset: readStart + UInt64(complete.consumedBytes),
                 state: result.state,
+                startedAt: result.startedAt,
                 currentTurnFailed: result.currentTurnFailed,
                 pendingPermissionCallIDs: result.pendingPermissionCallIDs
             ),
@@ -235,6 +247,7 @@ struct CodexTaskStatusLogParser {
         )
         return CodexTaskLogParseResult(
             state: result.state,
+            startedAt: result.startedAt,
             soundEvents: result.soundEvents,
             isInitialRead: !hasCachedBaseline
         )
@@ -266,16 +279,19 @@ struct CodexTaskStatusLogParser {
     private static func parse(
         _ data: Data,
         initialState: CodexTaskLogState,
+        startedAt initialStartedAt: Date?,
         currentTurnFailed initialFailure: Bool,
         pendingPermissionCallIDs initialPendingPermissionCallIDs: Set<String>
     ) -> (
         state: CodexTaskLogState,
+        startedAt: Date?,
         currentTurnFailed: Bool,
         recognizedLifecycle: Bool,
         soundEvents: [CodexTaskStatusSoundEvent],
         pendingPermissionCallIDs: Set<String>
     ) {
         var state = initialState
+        var startedAt = initialStartedAt
         var currentTurnFailed = initialFailure
         var pendingPermissionCallIDs = initialPendingPermissionCallIDs
         var recognizedLifecycle = false
@@ -287,19 +303,21 @@ struct CodexTaskStatusLogParser {
                 expectsPermissionOutput: !pendingPermissionCallIDs.isEmpty
             ) else { continue }
             switch event {
-            case .lifecycle("task_started"), .lifecycle("user_message"):
+            case let .lifecycle("task_started", eventDate),
+                 let .lifecycle("user_message", eventDate):
                 recognizedLifecycle = true
                 currentTurnFailed = false
                 pendingPermissionCallIDs.removeAll()
+                startedAt = eventDate ?? startedAt
                 state = .running
-            case .lifecycle("exec_command_end"),
-                 .lifecycle("patch_apply_end"),
-                 .lifecycle("mcp_tool_call_end"):
+            case .lifecycle("exec_command_end", _),
+                 .lifecycle("patch_apply_end", _),
+                 .lifecycle("mcp_tool_call_end", _):
                 recognizedLifecycle = true
                 if !currentTurnFailed && pendingPermissionCallIDs.isEmpty {
                     state = .running
                 }
-            case .lifecycle("task_complete"):
+            case .lifecycle("task_complete", _):
                 recognizedLifecycle = true
                 if !pendingPermissionCallIDs.isEmpty {
                     state = .waitingApproval
@@ -307,21 +325,24 @@ struct CodexTaskStatusLogParser {
                     state = .error
                 } else {
                     state = .idle
+                    startedAt = nil
                     soundEvents.append(.completed)
                 }
-            case .lifecycle("turn_aborted"):
+            case .lifecycle("turn_aborted", _):
                 recognizedLifecycle = true
                 currentTurnFailed = false
                 pendingPermissionCallIDs.removeAll()
+                startedAt = nil
                 state = .cancelled
                 soundEvents.append(.cancelled)
-            case .lifecycle("error"), .lifecycle("stream_error"):
+            case .lifecycle("error", _), .lifecycle("stream_error", _):
                 recognizedLifecycle = true
                 if !currentTurnFailed {
                     soundEvents.append(.error)
                 }
                 currentTurnFailed = true
                 pendingPermissionCallIDs.removeAll()
+                startedAt = nil
                 state = .error
             case let .permissionRequested(callID):
                 recognizedLifecycle = true
@@ -341,6 +362,7 @@ struct CodexTaskStatusLogParser {
         }
         return (
             state,
+            startedAt,
             currentTurnFailed,
             recognizedLifecycle,
             soundEvents,
@@ -349,7 +371,7 @@ struct CodexTaskStatusLogParser {
     }
 
     private enum ParsedEvent {
-        case lifecycle(String)
+        case lifecycle(String, Date?)
         case permissionRequested(String)
         case permissionResolved(String)
     }
@@ -370,7 +392,12 @@ struct CodexTaskStatusLogParser {
 
         if (raw["type"] as? String) == "event_msg",
            let type = payload["type"] as? String {
-            return .lifecycle(type)
+            let startedAt = (payload["started_at"] as? Double)
+                ?? (payload["started_at"] as? Int).map(TimeInterval.init)
+            return .lifecycle(
+                type,
+                startedAt.map { Date(timeIntervalSince1970: $0) }
+            )
         }
         guard (raw["type"] as? String) == "response_item",
               let type = payload["type"] as? String,

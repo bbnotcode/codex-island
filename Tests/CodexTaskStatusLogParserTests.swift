@@ -13,10 +13,16 @@ struct CodexTaskStatusLogParserTests {
         }
     }
 
-    static func event(_ type: String, detail: String = "") -> Data {
+    static func event(
+        _ type: String,
+        detail: String = "",
+        startedAt: TimeInterval? = nil
+    ) -> Data {
+        var eventPayload: [String: Any] = ["type": type, "detail": detail]
+        if let startedAt { eventPayload["started_at"] = startedAt }
         let payload: [String: Any] = [
             "type": "event_msg",
-            "payload": ["type": type, "detail": detail],
+            "payload": eventPayload,
         ]
         let data = try! JSONSerialization.data(withJSONObject: payload)
         return data + Data([0x0A])
@@ -210,25 +216,40 @@ struct CodexTaskStatusLogParserTests {
         )
 
         let shortTask = directory.appendingPathComponent("rollout-short-task.jsonl")
-        var shortTaskData = event("task_started")
+        let shortTaskStartedAt: TimeInterval = 1_785_000_000
+        var shortTaskData = event("task_started", startedAt: shortTaskStartedAt)
         shortTaskData.append(event("task_complete"))
         try shortTaskData.write(to: shortTask)
         let shortTaskResult = CodexTaskStatusLogParser.parseUpdate(at: shortTask)
         expect(
             shortTaskResult?.state == .idle
+                && shortTaskResult?.startedAt == nil
                 && shortTaskResult?.soundEvents == [.completed],
             "short task completed between polls still emits a completion event"
         )
 
         let incrementalTask = directory.appendingPathComponent("rollout-incremental-task.jsonl")
-        try event("task_started").write(to: incrementalTask)
+        let incrementalStartedAt: TimeInterval = 1_785_000_100
+        try event("task_started", startedAt: incrementalStartedAt).write(to: incrementalTask)
         let startedResult = CodexTaskStatusLogParser.parseUpdate(at: incrementalTask)
         try event("task_complete").append(to: incrementalTask)
         let completedResult = CodexTaskStatusLogParser.parseUpdate(at: incrementalTask)
         expect(
             startedResult?.soundEvents.isEmpty == true
+                && startedResult?.startedAt == Date(timeIntervalSince1970: incrementalStartedAt)
                 && completedResult?.soundEvents == [.completed],
             "incremental task completion emits exactly one completion event"
+        )
+
+        let earliest = CodexTaskStatusPolicy.earliestActiveStart(in: [
+            Date(timeIntervalSince1970: 300),
+            nil,
+            Date(timeIntervalSince1970: 100),
+            Date(timeIntervalSince1970: 200),
+        ])
+        expect(
+            earliest == Date(timeIntervalSince1970: 100),
+            "multiple active tasks use the earliest task start"
         )
 
         let parallelTask = directory.appendingPathComponent("rollout-parallel-task.jsonl")

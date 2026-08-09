@@ -563,6 +563,16 @@ struct SettingsView: View {
             }
             .disabled(!codexTaskStatus.enabled)
             .opacity(codexTaskStatus.enabled ? 1 : 0.4)
+            SettingsRow(
+                title: "Completion confetti",
+                subtitle: "Trigger Raycast confetti when a top-level task completes successfully."
+            ) {
+                SettingsToggle(isOn: codexTaskStatus.confettiEnabled) {
+                    codexTaskStatus.confettiEnabled.toggle()
+                }
+            }
+            .disabled(!codexTaskStatus.enabled)
+            .opacity(codexTaskStatus.enabled ? 1 : 0.4)
         }
         .padding(.horizontal, 14)
         .padding(.top, 18)

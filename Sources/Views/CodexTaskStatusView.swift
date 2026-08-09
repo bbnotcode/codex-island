@@ -25,7 +25,18 @@ struct CodexTaskStatusView: View {
                                 .foregroundStyle(.white.opacity(0.78))
                         }
 
-                        if let updatedAt = store.snapshot.updatedAt {
+                        if store.snapshot.activeTaskCount > 0,
+                           let startedAt = store.snapshot.startedAt {
+                            TimelineView(.periodic(from: .now, by: 1)) { context in
+                                Text(L10n.tr(
+                                    "%d active · %@",
+                                    store.snapshot.activeTaskCount,
+                                    Duration.compact(max(0, context.date.timeIntervalSince(startedAt)))
+                                ))
+                            }
+                            .font(Typography.caption)
+                            .foregroundStyle(.white.opacity(0.44))
+                        } else if let updatedAt = store.snapshot.updatedAt {
                             Text(L10n.tr("Updated %@", relative(updatedAt)))
                                 .font(Typography.caption)
                                 .foregroundStyle(.white.opacity(0.38))

@@ -475,7 +475,9 @@ private struct CompactCodexTaskStatusOverlay: View {
     }
 
     private func elapsedUpdate(at now: Date) -> String {
-        guard let date = store.snapshot.updatedAt else { return "—" }
+        guard store.snapshot.status == .running
+                || store.snapshot.status == .waitingApproval,
+              let date = store.snapshot.startedAt else { return "—" }
         return Duration.compact(max(0, now.timeIntervalSince(date)))
     }
 }

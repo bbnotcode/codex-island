@@ -8,6 +8,7 @@ final class CodexTaskStatusStore: ObservableObject {
     private static let enabledKey = "MacIsland.codexTaskStatus"
     private static let displayModeKey = "MacIsland.codexTaskStatusDisplayMode"
     private static let soundEnabledKey = "MacIsland.codexTaskStatusSound"
+    private static let confettiEnabledKey = "MacIsland.codexTaskStatusConfetti"
     private static let pollingInterval: TimeInterval = 15
     nonisolated private static let recentFileAge: TimeInterval = 86_400
     nonisolated private static let fullDirectoryScanInterval: TimeInterval = 5 * 60
@@ -62,6 +63,8 @@ final class CodexTaskStatusStore: ObservableObject {
         let status: Status
         let threadID: String?
         let updatedAt: Date?
+        let startedAt: Date?
+        let activeTaskCount: Int
     }
 
     @Published var enabled: Bool {
@@ -80,10 +83,17 @@ final class CodexTaskStatusStore: ObservableObject {
             UserDefaults.standard.set(soundEnabled, forKey: Self.soundEnabledKey)
         }
     }
+    @Published var confettiEnabled: Bool {
+        didSet {
+            UserDefaults.standard.set(confettiEnabled, forKey: Self.confettiEnabledKey)
+        }
+    }
     @Published private(set) var snapshot = Snapshot(
         status: .unavailable,
         threadID: nil,
-        updatedAt: nil
+        updatedAt: nil,
+        startedAt: nil,
+        activeTaskCount: 0
     )
 
     private var timer: Timer?
@@ -107,6 +117,10 @@ final class CodexTaskStatusStore: ObservableObject {
         )
         soundEnabled = Pref.seededBool(
             key: Self.soundEnabledKey,
+            default: false
+        )
+        confettiEnabled = Pref.seededBool(
+            key: Self.confettiEnabledKey,
             default: false
         )
     }
@@ -224,10 +238,15 @@ final class CodexTaskStatusStore: ObservableObject {
             if let snapshot = result.snapshot {
                 self.apply(snapshot)
             }
-            let shouldPlaySounds = self.hasCompletedInitialScan && self.soundEnabled
+            let shouldEmitEffects = self.hasCompletedInitialScan
             self.hasCompletedInitialScan = true
-            if shouldPlaySounds {
+            if shouldEmitEffects, self.soundEnabled {
                 self.playSounds(result.soundEvents, generation: generation)
+            }
+            if shouldEmitEffects,
+               self.confettiEnabled,
+               result.soundEvents.contains(.completed) {
+                self.triggerRaycastConfetti(generation: generation)
             }
         }
     }
@@ -265,6 +284,17 @@ final class CodexTaskStatusStore: ObservableObject {
         }
     }
 
+    private func triggerRaycastConfetti(generation: UInt64) {
+        guard monitoringGeneration == generation,
+              isRenderable,
+              NSWorkspace.shared.urlForApplication(
+                withBundleIdentifier: "com.raycast.macos"
+              ) != nil,
+              let url = URL(string: "raycast://confetti")
+        else { return }
+        NSWorkspace.shared.open(url)
+    }
+
     private var isRenderable: Bool {
         let visibility = ProviderVisibilityStore.shared
         return enabled && !visibility.claudeVisible && visibility.codexVisible
@@ -300,7 +330,13 @@ final class CodexTaskStatusStore: ObservableObject {
                 fingerprint: "unavailable",
                 snapshot: previousFingerprint == "unavailable"
                     ? nil
-                    : Snapshot(status: .unavailable, threadID: nil, updatedAt: nil),
+                    : Snapshot(
+                        status: .unavailable,
+                        threadID: nil,
+                        updatedAt: nil,
+                        startedAt: nil,
+                        activeTaskCount: 0
+                    ),
                 soundEvents: [],
                 cachedDayDirectories: cachedDayDirectories,
                 lastFullDirectoryScan: lastFullDirectoryScan
@@ -331,7 +367,13 @@ final class CodexTaskStatusStore: ObservableObject {
         if files.isEmpty {
             return ScanResult(
                 fingerprint: fingerprint,
-                snapshot: Snapshot(status: .idle, threadID: nil, updatedAt: nil),
+                snapshot: Snapshot(
+                    status: .idle,
+                    threadID: nil,
+                    updatedAt: nil,
+                    startedAt: nil,
+                    activeTaskCount: 0
+                ),
                 soundEvents: [],
                 cachedDayDirectories: discovery.cachedDayDirectories,
                 lastFullDirectoryScan: discovery.lastFullDirectoryScan
@@ -353,15 +395,33 @@ final class CodexTaskStatusStore: ObservableObject {
         }) else {
             return ScanResult(
                 fingerprint: fingerprint,
-                snapshot: Snapshot(status: .unavailable, threadID: nil, updatedAt: nil),
+                snapshot: Snapshot(
+                    status: .unavailable,
+                    threadID: nil,
+                    updatedAt: nil,
+                    startedAt: nil,
+                    activeTaskCount: 0
+                ),
                 soundEvents: soundEvents,
                 cachedDayDirectories: discovery.cachedDayDirectories,
                 lastFullDirectoryScan: discovery.lastFullDirectoryScan
             )
         }
+        let activeStates = states.filter {
+            $0.status == .running || $0.status == .waitingApproval
+        }
+        let aggregate = Snapshot(
+            status: selected.status,
+            threadID: selected.threadID,
+            updatedAt: selected.updatedAt,
+            startedAt: CodexTaskStatusPolicy.earliestActiveStart(
+                in: activeStates.map(\.startedAt)
+            ),
+            activeTaskCount: activeStates.count
+        )
         return ScanResult(
             fingerprint: fingerprint,
-            snapshot: selected,
+            snapshot: aggregate,
             soundEvents: soundEvents,
             cachedDayDirectories: discovery.cachedDayDirectories,
             lastFullDirectoryScan: discovery.lastFullDirectoryScan
@@ -514,7 +574,9 @@ final class CodexTaskStatusStore: ObservableObject {
             snapshot: Snapshot(
                 status: status,
                 threadID: threadID(from: url),
-                updatedAt: modified
+                updatedAt: modified,
+                startedAt: parsed.startedAt,
+                activeTaskCount: status == .running || status == .waitingApproval ? 1 : 0
             ),
             soundEvents: soundEvents
         )
