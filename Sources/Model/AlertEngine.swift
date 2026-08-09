@@ -119,7 +119,7 @@ final class AlertEngine: ObservableObject {
             AlertDecision.WindowInput(
                 provider: .codex,
                 visible: visibility.codexVisible,
-                window: usage.codex.fiveHour
+                window: usage.codex.preferredWindow.usage
             ),
         ]
 
@@ -320,4 +320,3 @@ enum AlertDecision {
         return CrossingsEvalResult(next: next, pulse: pulse)
     }
 }
-

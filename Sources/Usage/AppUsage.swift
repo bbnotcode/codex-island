@@ -56,6 +56,37 @@ struct WindowUsage {
     }
 }
 
+struct CodexRateLimitWindowCandidate {
+    let usage: WindowUsage
+    let duration: TimeInterval?
+}
+
+enum CodexRateLimitWindowClassifier {
+    static func classify(
+        primary: CodexRateLimitWindowCandidate?,
+        secondary: CodexRateLimitWindowCandidate?
+    ) -> (fiveHour: WindowUsage, weekly: WindowUsage) {
+        var fiveHour = WindowUsage.unknown
+        var weekly = WindowUsage.unknown
+
+        for (index, candidate) in [primary, secondary].enumerated() {
+            guard let candidate else { continue }
+            if let duration = candidate.duration {
+                if duration >= 24 * 3600 {
+                    weekly = candidate.usage
+                } else {
+                    fiveHour = candidate.usage
+                }
+            } else if index == 0 {
+                fiveHour = candidate.usage
+            } else {
+                weekly = candidate.usage
+            }
+        }
+        return (fiveHour, weekly)
+    }
+}
+
 struct AppUsage {
     var fiveHour: WindowUsage
     var weekly: WindowUsage
@@ -71,6 +102,11 @@ struct AppUsage {
 
     static let empty = AppUsage(fiveHour: .unknown, weekly: .unknown)
 
+    var preferredWindow: (kind: UsageWindow, usage: WindowUsage) {
+        if fiveHour.hasReading { return (.fiveHour, fiveHour) }
+        return (.weekly, weekly)
+    }
+
     /// Fold a fetch result into the values currently on screen.
     ///
     /// Per window: a fresh reading wins outright. A failed window keeps the
@@ -84,10 +120,25 @@ struct AppUsage {
     /// Callers that must NOT carry forward (a terminal auth failure, where the
     /// token can never refresh those numbers again) skip this and assign the
     /// fetched value directly — see `UsageStore.refresh`.
-    static func merged(fetched: AppUsage, retaining prior: AppUsage, at now: Date) -> AppUsage {
+    static func merged(
+        fetched: AppUsage,
+        retaining prior: AppUsage,
+        at now: Date,
+        retainMissingWindows: Bool = true
+    ) -> AppUsage {
         AppUsage(
-            fiveHour: carryForward(fetched.fiveHour, prior: prior.fiveHour, at: now),
-            weekly: carryForward(fetched.weekly, prior: prior.weekly, at: now),
+            fiveHour: carryForward(
+                fetched.fiveHour,
+                prior: prior.fiveHour,
+                at: now,
+                retainMissingWindows: retainMissingWindows
+            ),
+            weekly: carryForward(
+                fetched.weekly,
+                prior: prior.weekly,
+                at: now,
+                retainMissingWindows: retainMissingWindows
+            ),
             // Plan tier is read from the credential store, not the usage
             // response, so a failed fetch shouldn't blank the chip's badge.
             plan: fetched.plan ?? prior.plan
@@ -95,9 +146,13 @@ struct AppUsage {
     }
 
     private static func carryForward(
-        _ fetched: WindowUsage, prior: WindowUsage, at now: Date
+        _ fetched: WindowUsage,
+        prior: WindowUsage,
+        at now: Date,
+        retainMissingWindows: Bool
     ) -> WindowUsage {
         guard !fetched.hasReading, prior.hasReading else { return fetched }
+        if fetched.error == "no data", !retainMissingWindows { return fetched }
         if let reset = prior.resetAt, reset <= now { return fetched }
         return WindowUsage(
             usedPercent: prior.usedPercent, resetAt: prior.resetAt, error: fetched.error

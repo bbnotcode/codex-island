@@ -21,6 +21,13 @@
 "⚠ %d unpriced" = "⚠ %d unpriced";
 "$%@ cumulative" = "$%@ cumulative";
 "5h" = "5h";
+"5-hour" = "5-hour";
+"weekly" = "weekly";
+"%@: no data for %@ window" = "%@: no data for %@ window";
+"%@: %d percent of %@ window remaining" = "%@: %d percent of %@ window remaining";
+"%@: %d percent of %@ window remaining, %@" = "%@: %d percent of %@ window remaining, %@";
+"%@: %d percent of %@ window used" = "%@: %d percent of %@ window used";
+"%@: %d percent of %@ window used, %@" = "%@: %d percent of %@ window used, %@";
 "All tokens" = "All tokens";
 "All Tokens" = "All Tokens";
 "TOTAL" = "TOTAL";
@@ -132,6 +139,7 @@
 "Updated %@" = "Updated %@";
 "Status sounds" = "Status sounds";
 "Play a sound when a running task completes, is cancelled, or fails." = "Play a sound when a running task completes, is cancelled, or fails.";
+"Use distinct sounds for completion, approval, cancellation, and errors." = "Use distinct sounds for completion, approval, cancellation, and errors.";
 "Show on" = "Show on";
 "Sparkline" = "Sparkline";
 "Spacing" = "Spacing";
@@ -145,6 +153,7 @@
 "Target display" = "Target display";
 "Target Display" = "Target Display";
 "Tint the island and pulse the peek pill when 5-hour usage nears your limit." = "Tint the island and pulse the peek pill when 5-hour usage nears your limit.";
+"Tint the island and pulse the peek pill when usage nears your active limit." = "Tint the island and pulse the peek pill when usage nears your active limit.";
 "Tip: Command-click to cycle visualization" = "Tip: Command-click to cycle visualization";
 "Today" = "Today";
 "Token counting" = "Token counting";

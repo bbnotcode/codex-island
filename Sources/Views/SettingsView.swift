@@ -253,7 +253,7 @@ struct SettingsView: View {
             sectionLabel("Alerts")
             SettingsRow(
                 title: "Approaching-limit alerts",
-                subtitle: "Tint the island and pulse the peek pill when 5-hour usage nears your limit."
+                subtitle: "Tint the island and pulse the peek pill when usage nears your active limit."
             ) {
                 SettingsToggle(isOn: alertPrefs.enabled) {
                     // withAnimation here so the threshold rows + Preview row
@@ -555,7 +555,7 @@ struct SettingsView: View {
             .opacity(codexTaskStatus.enabled ? 1 : 0.4)
             SettingsRow(
                 title: "Status sounds",
-                subtitle: "Play a sound when a running task completes, is cancelled, or fails."
+                subtitle: "Use distinct sounds for completion, approval, cancellation, and errors."
             ) {
                 SettingsToggle(isOn: codexTaskStatus.soundEnabled) {
                     codexTaskStatus.soundEnabled.toggle()

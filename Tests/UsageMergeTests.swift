@@ -94,6 +94,48 @@ struct UsageMergeTests {
         expect(mixed.fiveHour.usedPercent == 0.16, "failed 5h carries forward")
         expect(mixed.weekly.usedPercent == 0.44, "successful weekly takes the fresh value")
 
+        let weeklyOnly = CodexRateLimitWindowClassifier.classify(
+            primary: CodexRateLimitWindowCandidate(
+                usage: reading(0.91, resetIn: 6 * 86400),
+                duration: 7 * 86400
+            ),
+            secondary: nil
+        )
+        expect(
+            !weeklyOnly.fiveHour.hasReading && weeklyOnly.weekly.usedPercent == 0.91,
+            "a seven-day Codex primary window is classified as weekly"
+        )
+        let migrated = AppUsage.merged(
+            fetched: pair(weeklyOnly.fiveHour, weeklyOnly.weekly),
+            retaining: good,
+            at: now,
+            retainMissingWindows: false
+        )
+        expect(
+            !migrated.fiveHour.hasReading && migrated.weekly.usedPercent == 0.91,
+            "a removed Codex 5h window does not retain the stale reading"
+        )
+        expect(
+            migrated.preferredWindow.kind == .weekly,
+            "weekly-only Codex usage becomes the preferred display window"
+        )
+
+        let legacyPair = CodexRateLimitWindowClassifier.classify(
+            primary: CodexRateLimitWindowCandidate(
+                usage: reading(0.20),
+                duration: nil
+            ),
+            secondary: CodexRateLimitWindowCandidate(
+                usage: reading(0.30),
+                duration: nil
+            )
+        )
+        expect(
+            legacyPair.fiveHour.usedPercent == 0.20
+                && legacyPair.weekly.usedPercent == 0.30,
+            "Codex responses without duration metadata keep legacy ordering"
+        )
+
         // MARK: window spans bound how long a recorded reading stays usable
 
         expect(UsageWindow.fiveHour.span == 5 * 3600, "5h span is five hours")

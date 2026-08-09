@@ -109,19 +109,43 @@ struct ChartsBlock: View {
                 ReauthState(color: color, usage: usage)
                     .transition(.chartSwap.animation(.chartSwap))
             } else {
-                HStack(spacing: 18) {
-                    ChartTile(style: style, color: color, labelKey: "5h",
-                              window: usage.fiveHour, seed: seed,
-                              provider: provider, windowKind: .fiveHour)
-                    ChartTile(style: style, color: color, labelKey: "week",
-                              window: usage.weekly, seed: seed + 1,
-                              provider: provider, windowKind: .weekly)
-                }
+                windowTiles
                 .transition(.chartSwap.animation(.chartSwap))
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .padding(.horizontal, 12)
+    }
+
+    @ViewBuilder
+    private var windowTiles: some View {
+        if provider == .codex,
+           usage.fiveHour.hasReading != usage.weekly.hasReading {
+            let preferred = usage.preferredWindow
+            HStack {
+                Spacer(minLength: 0)
+                ChartTile(
+                    style: style,
+                    color: color,
+                    labelKey: preferred.kind == .fiveHour ? "5h" : "week",
+                    window: preferred.usage,
+                    seed: preferred.kind == .fiveHour ? seed : seed + 1,
+                    provider: provider,
+                    windowKind: preferred.kind
+                )
+                .frame(maxWidth: 220)
+                Spacer(minLength: 0)
+            }
+        } else {
+            HStack(spacing: 18) {
+                ChartTile(style: style, color: color, labelKey: "5h",
+                          window: usage.fiveHour, seed: seed,
+                          provider: provider, windowKind: .fiveHour)
+                ChartTile(style: style, color: color, labelKey: "week",
+                          window: usage.weekly, seed: seed + 1,
+                          provider: provider, windowKind: .weekly)
+            }
+        }
     }
 }
 

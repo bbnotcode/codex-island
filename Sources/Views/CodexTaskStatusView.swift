@@ -66,6 +66,7 @@ struct CodexTaskStatusView: View {
                 )
                 .opacity(status == store.snapshot.status ? 1 : 0.28)
                 .frame(maxWidth: .infinity)
+                .help(L10n.tr(status.label))
             }
         }
         .padding(.horizontal, 6)

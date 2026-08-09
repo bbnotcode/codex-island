@@ -21,6 +21,13 @@
 "⚠ %d unpriced" = "⚠ %d 个模型缺价格";
 "$%@ cumulative" = "$%@ 累计";
 "5h" = "5小时";
+"5-hour" = "5 小时";
+"weekly" = "每周";
+"%@: no data for %@ window" = "%@：%@窗口暂无数据";
+"%@: %d percent of %@ window remaining" = "%@：%@窗口剩余 %d%%";
+"%@: %d percent of %@ window remaining, %@" = "%@：%@窗口剩余 %d%%，%@";
+"%@: %d percent of %@ window used" = "%@：已使用%@窗口的 %d%%";
+"%@: %d percent of %@ window used, %@" = "%@：已使用%@窗口的 %d%%，%@";
 "All tokens" = "全部 token";
 "All Tokens" = "全部 Token";
 "TOTAL" = "总计";
@@ -132,6 +139,7 @@
 "Updated %@" = "更新于%@";
 "Status sounds" = "状态提示音";
 "Play a sound when a running task completes, is cancelled, or fails." = "运行中的任务完成、取消或失败时播放提示音。";
+"Use distinct sounds for completion, approval, cancellation, and errors." = "任务完成、等待审批、取消和报错时使用不同的提示音。";
 "Show on" = "显示在";
 "Sparkline" = "折线";
 "Spacing" = "间距";
@@ -145,6 +153,7 @@
 "Target display" = "目标屏幕";
 "Target Display" = "目标屏幕";
 "Tint the island and pulse the peek pill when 5-hour usage nears your limit." = "当 5 小时用量接近限额时，为岛和预览胶囊显示提醒效果。";
+"Tint the island and pulse the peek pill when usage nears your active limit." = "当当前用量窗口接近限额时，为岛和预览胶囊显示提醒效果。";
 "Tip: Command-click to cycle visualization" = "提示：Command 点击可切换可视化";
 "Today" = "今天";
 "Token counting" = "Token 统计";

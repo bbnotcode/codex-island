@@ -17,6 +17,7 @@ struct NotchPeekPill: View {
     let loading: Bool
     let tint: Color
     let alignment: HorizontalAlignment
+    var fallbackResetText = "5h"
     var severity: AlertEngine.Severity = .none
     @ObservedObject private var usageDisplay = UsageDisplayModeStore.shared
 
@@ -75,7 +76,7 @@ struct NotchPeekPill: View {
     /// window" label from an active "5h until reset" countdown — same
     /// glyph shape, weaker visual presence.
     private var resetLabel: some View {
-        Text(resetText ?? "5h")
+        Text(resetText ?? fallbackResetText)
             .font(Typography.bodyNumber)
             .foregroundStyle(.white.opacity(resetText == nil ? 0.45 : 0.70))
     }
