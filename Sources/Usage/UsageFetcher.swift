@@ -32,9 +32,13 @@ enum UsageFetcher {
                   let rl = obj["rate_limit"] as? [String: Any] else {
                 return errorPair("parse error")
             }
+            let windows = CodexRateLimitWindowClassifier.classify(
+                primary: parseCodexWindow(rl["primary_window"]),
+                secondary: parseCodexWindow(rl["secondary_window"])
+            )
             return AppUsage(
-                fiveHour: parseCodexWindow(rl["primary_window"]),
-                weekly: parseCodexWindow(rl["secondary_window"]),
+                fiveHour: windows.fiveHour,
+                weekly: windows.weekly,
                 plan: obj["plan_type"] as? String
             )
         } catch {
@@ -58,11 +62,16 @@ enum UsageFetcher {
         return token
     }
 
-    private static func parseCodexWindow(_ obj: Any?) -> WindowUsage {
-        guard let d = obj as? [String: Any] else { return .unknown }
+    private static func parseCodexWindow(_ obj: Any?) -> CodexRateLimitWindowCandidate? {
+        guard let d = obj as? [String: Any] else { return nil }
         let used = (d["used_percent"] as? Double) ?? 0
         let resetAt = (d["reset_at"] as? Double).map { Date(timeIntervalSince1970: $0) }
-        return WindowUsage(usedPercent: used / 100, resetAt: resetAt, error: nil)
+        let duration = (d["limit_window_seconds"] as? Double)
+            ?? (d["limit_window_seconds"] as? Int).map(TimeInterval.init)
+        return CodexRateLimitWindowCandidate(
+            usage: WindowUsage(usedPercent: used / 100, resetAt: resetAt, error: nil),
+            duration: duration
+        )
     }
 
     static func fetchCodexResetCredits() async -> CodexResetCredits? {

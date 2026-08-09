@@ -16,8 +16,8 @@
 
 CodexIsland is a native macOS overlay that turns the MacBook notch into a
 Dynamic-Island-style live activity for Claude Code and Codex usage limits. It
-sits quietly over the notch, peeks on hover with the 5-hour headline, and
-expands on click to show both providers' 5-hour and weekly windows with reset
+sits quietly over the notch, peeks on hover with the provider's active limit, and
+expands on click to show the available usage windows with reset
 timing, chart controls, local-log cost estimates, and a year-at-a-glance usage
 history.
 
@@ -30,8 +30,9 @@ providers' own usage endpoints.
 
 ## What it does
 
-- **Two providers, four windows.** Claude 5h + 7d and Codex 5h + 7d live in
-  one panel.
+- **Adaptive provider windows.** Claude keeps its 5h + 7d pair. Codex windows
+  are classified from the API's reported duration, so weekly-only plans show
+  one truthful weekly tile instead of mislabeling it as 5h.
 - **Notch-native overlay.** The compact state is a black pill aligned to the
   physical notch, drawn with continuous (squircle) corners that match the
   hardware. On non-notched displays it falls back to a configurable menu-bar
@@ -47,7 +48,7 @@ providers' own usage endpoints.
 - **Used or remaining quota.** Display provider windows as usage consumed or
   quota remaining.
 - **Approaching-limit alerts.** Optional warning and critical thresholds tint
-  the island and pulse the peek pill as a visible 5-hour window nears its
+  the island and pulse the peek pill as a visible active window nears its
   limit.
 - **Codex reset credits.** When reset credits are available, the Usage footer
   shows their count and expiration details.
@@ -160,7 +161,7 @@ the first peek. Opening Settings also triggers a fresh fetch.
 
 ## Using the app
 
-- Hover the notch to peek at the current 5-hour usage.
+- Hover the notch to peek at the provider's current active usage window.
 - Click the island to expand the full panel.
 - Swipe horizontally on the panel (or use the indicator dots) to move between
   **Usage**, **Cost**, and **Overview**.

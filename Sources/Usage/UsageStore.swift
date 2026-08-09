@@ -129,7 +129,12 @@ final class UsageStore: ObservableObject {
             // captioned with what went wrong. A window with nothing to carry
             // stays at `hasReading == false`, which the UI renders as "—"
             // instead of the fabricated 0% it used to show.
-            self.codex = AppUsage.merged(fetched: c, retaining: self.codex, at: now)
+            self.codex = AppUsage.merged(
+                fetched: c,
+                retaining: self.codex,
+                at: now,
+                retainMissingWindows: false
+            )
             if let cl {
                 if UsageStore.isRateLimited(cl) {
                     self.claudeCooldownUntil = Date().addingTimeInterval(UsageStore.rateLimitCooldown)
