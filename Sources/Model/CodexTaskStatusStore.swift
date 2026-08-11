@@ -528,7 +528,8 @@ final class CodexTaskStatusStore: ObservableObject {
             .map(\.0)
         let selectedFiles = CodexTaskStatusFilePolicy.selectTopLevelFiles(
             from: filesByRecency,
-            maximumCount: maximumTrackedFiles
+            maximumCount: maximumTrackedFiles,
+            prioritizing: CodexTaskStatusLogParser.waitingApprovalURLs()
         )
         return RolloutDiscovery(
             files: selectedFiles,

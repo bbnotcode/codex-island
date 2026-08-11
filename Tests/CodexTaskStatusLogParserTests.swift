@@ -326,6 +326,20 @@ struct CodexTaskStatusLogParserTests {
             "subagents do not consume the top-level task file limit"
         )
 
+        let newerTopLevelLogs = (0..<5).map { index in
+            directory.appendingPathComponent("rollout-newer-top-level-\(index).jsonl")
+        }
+        let selectedWithApprovalPinned = CodexTaskStatusFilePolicy.selectTopLevelFiles(
+            from: newerTopLevelLogs + [approvalTask],
+            maximumCount: 3,
+            prioritizing: [approvalTask]
+        )
+        expect(
+            selectedWithApprovalPinned.contains(approvalTask)
+                && selectedWithApprovalPinned.count == 3,
+            "waiting approval remains tracked when newer tasks fill the file limit"
+        )
+
         if failures > 0 {
             print("\(failures) failure(s)")
             exit(1)

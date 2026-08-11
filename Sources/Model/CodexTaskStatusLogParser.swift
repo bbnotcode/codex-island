@@ -26,12 +26,16 @@ struct CodexTaskLogParseResult: Equatable, Sendable {
 enum CodexTaskStatusFilePolicy {
     static func selectTopLevelFiles(
         from filesByRecency: [URL],
-        maximumCount: Int
+        maximumCount: Int,
+        prioritizing priorityURLs: Set<URL> = []
     ) -> [URL] {
         guard maximumCount > 0 else { return [] }
-        return Array(filesByRecency.lazy.filter {
+        let topLevelFiles = filesByRecency.filter {
             !CodexTaskStatusLogParser.isSubagentSession(at: $0)
-        }.prefix(maximumCount))
+        }
+        let prioritized = topLevelFiles.filter { priorityURLs.contains($0) }
+        let remaining = topLevelFiles.lazy.filter { !priorityURLs.contains($0) }
+        return prioritized + remaining.prefix(max(0, maximumCount - prioritized.count))
     }
 }
 
@@ -124,6 +128,14 @@ struct CodexTaskStatusLogParser {
             subagentSessions = subagentSessions.filter { urls.contains($0.key) }
         }
 
+        func waitingApprovalURLs() -> Set<URL> {
+            lock.lock()
+            defer { lock.unlock() }
+            return Set(entries.compactMap { url, entry in
+                entry.state == .waitingApproval ? url : nil
+            })
+        }
+
         func subagentSession(for url: URL) -> Bool? {
             lock.lock()
             defer { lock.unlock() }
@@ -139,6 +151,10 @@ struct CodexTaskStatusLogParser {
 
     static func retainCache(for urls: Set<URL>) {
         cache.retain(urls: urls)
+    }
+
+    static func waitingApprovalURLs() -> Set<URL> {
+        cache.waitingApprovalURLs()
     }
 
     static func isSubagentSession(at url: URL, maxBytes: Int = 64 * 1024) -> Bool {
