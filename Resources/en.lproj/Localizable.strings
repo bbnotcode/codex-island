@@ -141,7 +141,7 @@
 "Play a sound when a running task completes, is cancelled, or fails." = "Play a sound when a running task completes, is cancelled, or fails.";
 "Use distinct sounds for completion, approval, cancellation, and errors." = "Use distinct sounds for completion, approval, cancellation, and errors.";
 "Completion confetti" = "Completion confetti";
-"Trigger Raycast confetti when a top-level task completes successfully." = "Trigger Raycast confetti when a top-level task completes successfully.";
+"Trigger Raycast Beta confetti when a top-level task completes successfully." = "Trigger Raycast Beta confetti when a top-level task completes successfully.";
 "%d active · %@" = "%d active · %@";
 "Show on" = "Show on";
 "Sparkline" = "Sparkline";

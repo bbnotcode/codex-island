@@ -288,9 +288,9 @@ final class CodexTaskStatusStore: ObservableObject {
         guard monitoringGeneration == generation,
               isRenderable,
               NSWorkspace.shared.urlForApplication(
-                withBundleIdentifier: "com.raycast.macos"
+                withBundleIdentifier: "com.raycast-x.macos"
               ) != nil,
-              let url = URL(string: "raycast://confetti")
+              let url = URL(string: "raycast-x://confetti")
         else { return }
         NSWorkspace.shared.open(url)
     }
