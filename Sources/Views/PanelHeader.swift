@@ -57,8 +57,9 @@ struct PanelHeader: View {
             Text(L10n.tr("Codex task status"))
                 .font(Typography.providerTitle)
                 .foregroundStyle(.white)
-            if taskStatus.displayMode == .iconAndText {
-                Text(L10n.tr(taskStatus.snapshot.status.compactLabel))
+            if taskStatus.displayMode == .iconAndText
+                || taskStatus.snapshot.status.shouldForceCompactLabel {
+                Text(headerStatusLabel)
                     .font(Typography.chip)
                     .tracking(0.5)
                     .foregroundStyle(CodexTaskStatusGlyph.color(for: taskStatus.snapshot.status))
@@ -76,6 +77,17 @@ struct PanelHeader: View {
         .accessibilityLabel(
             L10n.tr("Codex status: %@", L10n.tr(taskStatus.snapshot.status.label))
         )
+    }
+
+    private var headerStatusLabel: String {
+        if taskStatus.snapshot.status == .waitingApproval,
+           taskStatus.snapshot.waitingApprovalTaskCount > 1 {
+            return L10n.tr(
+                "Approval count %d",
+                taskStatus.snapshot.waitingApprovalTaskCount
+            )
+        }
+        return L10n.tr(taskStatus.snapshot.status.compactLabel)
     }
 
     @ViewBuilder

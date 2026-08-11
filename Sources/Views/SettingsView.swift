@@ -555,7 +555,7 @@ struct SettingsView: View {
             .opacity(codexTaskStatus.enabled ? 1 : 0.4)
             SettingsRow(
                 title: "Status sounds",
-                subtitle: "Use distinct sounds for completion, approval, cancellation, and errors."
+                subtitle: "Use distinct sounds for each state and repeat pending approval reminders up to twice."
             ) {
                 SettingsToggle(isOn: codexTaskStatus.soundEnabled) {
                     codexTaskStatus.soundEnabled.toggle()

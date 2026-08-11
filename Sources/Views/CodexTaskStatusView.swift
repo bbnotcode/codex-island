@@ -28,11 +28,7 @@ struct CodexTaskStatusView: View {
                         if store.snapshot.activeTaskCount > 0,
                            let startedAt = store.snapshot.startedAt {
                             TimelineView(.periodic(from: .now, by: 1)) { context in
-                                Text(L10n.tr(
-                                    "%d active · %@",
-                                    store.snapshot.activeTaskCount,
-                                    Duration.compact(max(0, context.date.timeIntervalSince(startedAt)))
-                                ))
+                                Text(activitySummary(at: context.date, startedAt: startedAt))
                             }
                             .font(Typography.caption)
                             .foregroundStyle(.white.opacity(0.44))
@@ -106,6 +102,19 @@ struct CodexTaskStatusView: View {
 
     private func relative(_ date: Date) -> String {
         Self.relativeFormatter.localizedString(for: date, relativeTo: Date())
+    }
+
+    private func activitySummary(at date: Date, startedAt: Date) -> String {
+        let duration = Duration.compact(max(0, date.timeIntervalSince(startedAt)))
+        if store.snapshot.waitingApprovalTaskCount > 0 {
+            return L10n.tr(
+                "%d waiting · %d running · %@",
+                store.snapshot.waitingApprovalTaskCount,
+                store.snapshot.runningTaskCount,
+                duration
+            )
+        }
+        return L10n.tr("%d active · %@", store.snapshot.activeTaskCount, duration)
     }
 }
 

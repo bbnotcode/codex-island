@@ -1,5 +1,6 @@
 import AppKit
 import Combine
+import Darwin
 import Foundation
 
 @MainActor
@@ -10,6 +11,8 @@ final class CodexTaskStatusStore: ObservableObject {
     private static let soundEnabledKey = "MacIsland.codexTaskStatusSound"
     private static let confettiEnabledKey = "MacIsland.codexTaskStatusConfetti"
     private static let pollingInterval: TimeInterval = 15
+    private static let approvalReminderInterval: TimeInterval = 90
+    private static let maximumApprovalReminders = 2
     nonisolated private static let recentFileAge: TimeInterval = 86_400
     nonisolated private static let fullDirectoryScanInterval: TimeInterval = 5 * 60
     nonisolated private static let maximumDayLookback = 30
@@ -57,6 +60,10 @@ final class CodexTaskStatusStore: ObservableObject {
             }
         }
 
+        var shouldForceCompactLabel: Bool {
+            self == .waitingApproval || self == .error
+        }
+
     }
 
     struct Snapshot: Equatable, Sendable {
@@ -64,7 +71,12 @@ final class CodexTaskStatusStore: ObservableObject {
         let threadID: String?
         let updatedAt: Date?
         let startedAt: Date?
-        let activeTaskCount: Int
+        let runningTaskCount: Int
+        let waitingApprovalTaskCount: Int
+
+        var activeTaskCount: Int {
+            runningTaskCount + waitingApprovalTaskCount
+        }
     }
 
     @Published var enabled: Bool {
@@ -93,7 +105,8 @@ final class CodexTaskStatusStore: ObservableObject {
         threadID: nil,
         updatedAt: nil,
         startedAt: nil,
-        activeTaskCount: 0
+        runningTaskCount: 0,
+        waitingApprovalTaskCount: 0
     )
 
     private var timer: Timer?
@@ -105,6 +118,12 @@ final class CodexTaskStatusStore: ObservableObject {
     private var lastFullDirectoryScan: Date?
     private var hasCompletedInitialScan = false
     private var monitoringStartedAt: Date?
+    private var approvalReminderCount = 0
+    private var nextApprovalReminderAt: Date?
+    private var watchedDirectory: URL?
+    private var directoryWatcher: DispatchSourceFileSystemObject?
+    private var fileWatchers: [URL: DispatchSourceFileSystemObject] = [:]
+    private var watcherRefreshWorkItem: DispatchWorkItem?
 
     private init() {
         enabled = Pref.seededBool(
@@ -150,6 +169,8 @@ final class CodexTaskStatusStore: ObservableObject {
         guard active else {
             hasCompletedInitialScan = false
             monitoringStartedAt = nil
+            resetApprovalReminder()
+            stopFileWatching()
             return
         }
         hasCompletedInitialScan = false
@@ -159,7 +180,10 @@ final class CodexTaskStatusStore: ObservableObject {
             withTimeInterval: Self.pollingInterval,
             repeats: true
         ) { [weak self] _ in
-            Task { @MainActor in self?.refresh() }
+            Task { @MainActor in
+                self?.refresh()
+                self?.checkApprovalReminder()
+            }
         }
     }
 
@@ -235,6 +259,10 @@ final class CodexTaskStatusStore: ObservableObject {
             self.lastScanFingerprint = result.fingerprint
             self.cachedDayDirectories = result.cachedDayDirectories
             self.lastFullDirectoryScan = result.lastFullDirectoryScan
+            self.updateFileWatching(
+                directory: result.watchDirectory,
+                files: result.watchedFiles
+            )
             if let snapshot = result.snapshot {
                 self.apply(snapshot)
             }
@@ -252,7 +280,101 @@ final class CodexTaskStatusStore: ObservableObject {
     }
 
     private func apply(_ nextSnapshot: Snapshot) {
+        let enteredApproval = nextSnapshot.waitingApprovalTaskCount > 0
+            && (snapshot.waitingApprovalTaskCount == 0
+                || snapshot.threadID != nextSnapshot.threadID)
         snapshot = nextSnapshot
+        if enteredApproval {
+            approvalReminderCount = 0
+            nextApprovalReminderAt = Date().addingTimeInterval(
+                Self.approvalReminderInterval
+            )
+        } else if nextSnapshot.waitingApprovalTaskCount == 0 {
+            resetApprovalReminder()
+        }
+    }
+
+    private func checkApprovalReminder() {
+        guard snapshot.waitingApprovalTaskCount > 0,
+              soundEnabled,
+              approvalReminderCount < Self.maximumApprovalReminders,
+              let nextApprovalReminderAt,
+              Date() >= nextApprovalReminderAt
+        else { return }
+        playSound(for: .approvalRequired)
+        approvalReminderCount += 1
+        self.nextApprovalReminderAt = approvalReminderCount < Self.maximumApprovalReminders
+            ? Date().addingTimeInterval(Self.approvalReminderInterval)
+            : nil
+    }
+
+    private func resetApprovalReminder() {
+        approvalReminderCount = 0
+        nextApprovalReminderAt = nil
+    }
+
+    private func updateFileWatching(directory: URL?, files: [URL]) {
+        if watchedDirectory != directory {
+            directoryWatcher?.cancel()
+            directoryWatcher = nil
+            watchedDirectory = directory
+            if let directory {
+                directoryWatcher = makeFileWatcher(
+                    at: directory,
+                    events: [.write, .rename, .delete]
+                )
+            }
+        }
+
+        let desiredFiles = Set(files)
+        let removedFiles = fileWatchers.keys.filter { !desiredFiles.contains($0) }
+        for url in removedFiles {
+            fileWatchers.removeValue(forKey: url)?.cancel()
+        }
+        for url in desiredFiles where fileWatchers[url] == nil {
+            fileWatchers[url] = makeFileWatcher(
+                at: url,
+                events: [.write, .extend, .attrib, .rename, .delete]
+            )
+        }
+    }
+
+    private func makeFileWatcher(
+        at url: URL,
+        events: DispatchSource.FileSystemEvent
+    ) -> DispatchSourceFileSystemObject? {
+        let descriptor = open(url.path, O_EVTONLY)
+        guard descriptor >= 0 else { return nil }
+        let source = DispatchSource.makeFileSystemObjectSource(
+            fileDescriptor: descriptor,
+            eventMask: events,
+            queue: DispatchQueue.global(qos: .utility)
+        )
+        source.setEventHandler { [weak self] in
+            Task { @MainActor in self?.scheduleWatcherRefresh() }
+        }
+        source.setCancelHandler { close(descriptor) }
+        source.resume()
+        return source
+    }
+
+    private func scheduleWatcherRefresh() {
+        watcherRefreshWorkItem?.cancel()
+        let workItem = DispatchWorkItem { [weak self] in
+            Task { @MainActor in self?.refresh() }
+        }
+        watcherRefreshWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25, execute: workItem)
+    }
+
+    private func stopFileWatching() {
+        watcherRefreshWorkItem?.cancel()
+        watcherRefreshWorkItem = nil
+        directoryWatcher?.cancel()
+        directoryWatcher = nil
+        watchedDirectory = nil
+        fileWatchers.values.forEach { $0.cancel() }
+        fileWatchers.removeAll()
     }
 
     private func playSounds(
@@ -306,12 +428,15 @@ final class CodexTaskStatusStore: ObservableObject {
         let soundEvents: [CodexTaskStatusSoundEvent]
         let cachedDayDirectories: [URL]
         let lastFullDirectoryScan: Date?
+        let watchedFiles: [URL]
+        let watchDirectory: URL?
     }
 
     private struct RolloutDiscovery: Sendable {
         let files: [URL]
         let cachedDayDirectories: [URL]
         let lastFullDirectoryScan: Date?
+        let watchDirectory: URL
     }
 
     nonisolated private static func scan(
@@ -335,11 +460,14 @@ final class CodexTaskStatusStore: ObservableObject {
                         threadID: nil,
                         updatedAt: nil,
                         startedAt: nil,
-                        activeTaskCount: 0
+                        runningTaskCount: 0,
+                        waitingApprovalTaskCount: 0
                     ),
                 soundEvents: [],
                 cachedDayDirectories: cachedDayDirectories,
-                lastFullDirectoryScan: lastFullDirectoryScan
+                lastFullDirectoryScan: lastFullDirectoryScan,
+                watchedFiles: [],
+                watchDirectory: nil
             )
         }
         let files = discovery.files
@@ -360,7 +488,9 @@ final class CodexTaskStatusStore: ObservableObject {
                 snapshot: nil,
                 soundEvents: [],
                 cachedDayDirectories: discovery.cachedDayDirectories,
-                lastFullDirectoryScan: discovery.lastFullDirectoryScan
+                lastFullDirectoryScan: discovery.lastFullDirectoryScan,
+                watchedFiles: files,
+                watchDirectory: discovery.watchDirectory
             )
         }
 
@@ -372,11 +502,14 @@ final class CodexTaskStatusStore: ObservableObject {
                     threadID: nil,
                     updatedAt: nil,
                     startedAt: nil,
-                    activeTaskCount: 0
+                    runningTaskCount: 0,
+                    waitingApprovalTaskCount: 0
                 ),
                 soundEvents: [],
                 cachedDayDirectories: discovery.cachedDayDirectories,
-                lastFullDirectoryScan: discovery.lastFullDirectoryScan
+                lastFullDirectoryScan: discovery.lastFullDirectoryScan,
+                watchedFiles: files,
+                watchDirectory: discovery.watchDirectory
             )
         }
 
@@ -400,11 +533,14 @@ final class CodexTaskStatusStore: ObservableObject {
                     threadID: nil,
                     updatedAt: nil,
                     startedAt: nil,
-                    activeTaskCount: 0
+                    runningTaskCount: 0,
+                    waitingApprovalTaskCount: 0
                 ),
                 soundEvents: soundEvents,
                 cachedDayDirectories: discovery.cachedDayDirectories,
-                lastFullDirectoryScan: discovery.lastFullDirectoryScan
+                lastFullDirectoryScan: discovery.lastFullDirectoryScan,
+                watchedFiles: files,
+                watchDirectory: discovery.watchDirectory
             )
         }
         let activeStates = states.filter {
@@ -417,14 +553,19 @@ final class CodexTaskStatusStore: ObservableObject {
             startedAt: CodexTaskStatusPolicy.earliestActiveStart(
                 in: activeStates.map(\.startedAt)
             ),
-            activeTaskCount: activeStates.count
+            runningTaskCount: activeStates.filter { $0.status == .running }.count,
+            waitingApprovalTaskCount: activeStates.filter {
+                $0.status == .waitingApproval
+            }.count
         )
         return ScanResult(
             fingerprint: fingerprint,
             snapshot: aggregate,
             soundEvents: soundEvents,
             cachedDayDirectories: discovery.cachedDayDirectories,
-            lastFullDirectoryScan: discovery.lastFullDirectoryScan
+            lastFullDirectoryScan: discovery.lastFullDirectoryScan,
+            watchedFiles: files,
+            watchDirectory: discovery.watchDirectory
         )
     }
 
@@ -536,7 +677,8 @@ final class CodexTaskStatusStore: ObservableObject {
             cachedDayDirectories: directoriesWithRecentFiles.sorted {
                 $0.path < $1.path
             },
-            lastFullDirectoryScan: needsFullScan ? now : lastFullDirectoryScan
+            lastFullDirectoryScan: needsFullScan ? now : lastFullDirectoryScan,
+            watchDirectory: currentDayDirectory
         )
     }
 
@@ -577,7 +719,8 @@ final class CodexTaskStatusStore: ObservableObject {
                 threadID: threadID(from: url),
                 updatedAt: modified,
                 startedAt: parsed.startedAt,
-                activeTaskCount: status == .running || status == .waitingApproval ? 1 : 0
+                runningTaskCount: status == .running ? 1 : 0,
+                waitingApprovalTaskCount: status == .waitingApproval ? 1 : 0
             ),
             soundEvents: soundEvents
         )

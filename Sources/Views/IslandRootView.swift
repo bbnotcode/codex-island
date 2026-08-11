@@ -397,7 +397,7 @@ private struct CompactCodexTaskStatusOverlay: View {
     var body: some View {
         if shouldShow {
             Group {
-                if showsDetails {
+                if showsDetails || store.snapshot.status.shouldForceCompactLabel {
                     ZStack {
                         HStack(spacing: 0) {
                             Group {
@@ -414,8 +414,9 @@ private struct CompactCodexTaskStatusOverlay: View {
                                     .frame(width: 44, alignment: .center)
 
                             Group {
-                                if store.displayMode == .iconAndText {
-                                    Text(L10n.tr(store.snapshot.status.compactLabel))
+                                if store.displayMode == .iconAndText
+                                    || store.snapshot.status.shouldForceCompactLabel {
+                                    Text(compactStatusLabel)
                                         .font(Typography.bodyNumber)
                                         .foregroundStyle(.white.opacity(0.68))
                                         .lineLimit(1)
@@ -435,7 +436,8 @@ private struct CompactCodexTaskStatusOverlay: View {
                             .frame(width: 44, alignment: .center)
                         }
 
-                        if store.displayMode == .iconAndText {
+                        if store.displayMode == .iconAndText
+                            || store.snapshot.status.shouldForceCompactLabel {
                             Text("·")
                                 .font(Typography.bodyNumber)
                                 .foregroundStyle(.white.opacity(0.32))
@@ -472,6 +474,17 @@ private struct CompactCodexTaskStatusOverlay: View {
 
     private var statusColor: Color {
         CodexTaskStatusGlyph.color(for: store.snapshot.status)
+    }
+
+    private var compactStatusLabel: String {
+        if store.snapshot.status == .waitingApproval,
+           store.snapshot.waitingApprovalTaskCount > 1 {
+            return L10n.tr(
+                "Approval count %d",
+                store.snapshot.waitingApprovalTaskCount
+            )
+        }
+        return L10n.tr(store.snapshot.status.compactLabel)
     }
 
     private func elapsedUpdate(at now: Date) -> String {

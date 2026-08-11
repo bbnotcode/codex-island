@@ -139,10 +139,12 @@
 "Updated %@" = "Updated %@";
 "Status sounds" = "Status sounds";
 "Play a sound when a running task completes, is cancelled, or fails." = "Play a sound when a running task completes, is cancelled, or fails.";
-"Use distinct sounds for completion, approval, cancellation, and errors." = "Use distinct sounds for completion, approval, cancellation, and errors.";
+"Use distinct sounds for each state and repeat pending approval reminders up to twice." = "Use distinct sounds for each state and repeat pending approval reminders up to twice.";
 "Completion confetti" = "Completion confetti";
 "Trigger Raycast Beta confetti when a top-level task completes successfully." = "Trigger Raycast Beta confetti when a top-level task completes successfully.";
 "%d active · %@" = "%d active · %@";
+"%d waiting · %d running · %@" = "%d waiting · %d running · %@";
+"Approval count %d" = "Approval %d";
 "Show on" = "Show on";
 "Sparkline" = "Sparkline";
 "Spacing" = "Spacing";
