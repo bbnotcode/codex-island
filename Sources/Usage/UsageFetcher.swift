@@ -32,10 +32,7 @@ enum UsageFetcher {
                   let rl = obj["rate_limit"] as? [String: Any] else {
                 return errorPair("parse error")
             }
-            let windows = CodexRateLimitWindowClassifier.classify(
-                primary: parseCodexWindow(rl["primary_window"]),
-                secondary: parseCodexWindow(rl["secondary_window"])
-            )
+            let windows = routeCodexWindows(rl)
             return AppUsage(
                 fiveHour: windows.fiveHour,
                 weekly: windows.weekly,
@@ -62,16 +59,40 @@ enum UsageFetcher {
         return token
     }
 
-    private static func parseCodexWindow(_ obj: Any?) -> CodexRateLimitWindowCandidate? {
-        guard let d = obj as? [String: Any] else { return nil }
+    /// The window slots stopped being positional in mid-2026: plans with a
+    /// single weekly limit report it as `primary_window` with
+    /// `limit_window_seconds: 604800` and `secondary_window: null`, so
+    /// primary→5h / secondary→weekly mislabels the only real reading. Route
+    /// each reported window by its advertised span instead — a day cleanly
+    /// separates 5h (18000s) from weekly (604800s) — and fall back to slot
+    /// order for older shapes that omit `limit_window_seconds`.
+    static func routeCodexWindows(_ rl: [String: Any]) -> (fiveHour: WindowUsage, weekly: WindowUsage) {
+        var fiveHour: WindowUsage?
+        var weekly: WindowUsage?
+        let slots: [(key: String, fallback: UsageWindow)] = [
+            ("primary_window", .fiveHour),
+            ("secondary_window", .weekly),
+        ]
+        for (key, fallback) in slots {
+            guard let d = rl[key] as? [String: Any] else { continue }
+            let span = d["limit_window_seconds"] as? Double
+            let kind = span.map { $0 >= 86400 ? UsageWindow.weekly : .fiveHour } ?? fallback
+            // Same-kind collision: the earlier slot wins. Primary is the
+            // provider's headline window — a trailing sibling silently
+            // overwriting it would drop the real reading.
+            switch kind {
+            case .fiveHour: if fiveHour == nil { fiveHour = parseCodexWindow(d) }
+            case .weekly:   if weekly == nil { weekly = parseCodexWindow(d) }
+            }
+        }
+        return (fiveHour ?? .unknown, weekly ?? .unknown)
+    }
+
+    private static func parseCodexWindow(_ obj: Any?) -> WindowUsage {
+        guard let d = obj as? [String: Any] else { return .unknown }
         let used = (d["used_percent"] as? Double) ?? 0
         let resetAt = (d["reset_at"] as? Double).map { Date(timeIntervalSince1970: $0) }
-        let duration = (d["limit_window_seconds"] as? Double)
-            ?? (d["limit_window_seconds"] as? Int).map(TimeInterval.init)
-        return CodexRateLimitWindowCandidate(
-            usage: WindowUsage(usedPercent: used / 100, resetAt: resetAt, error: nil),
-            duration: duration
-        )
+        return WindowUsage(usedPercent: used / 100, resetAt: resetAt, error: nil)
     }
 
     static func fetchCodexResetCredits() async -> CodexResetCredits? {

@@ -40,6 +40,15 @@ struct WindowUsage {
     /// attached. That still counts as a reading.
     var hasReading: Bool { !(error != nil && usedPercent == 0) }
 
+    /// True for the passive sentinel a successfully parsed response leaves on
+    /// a window it doesn't include (`WindowUsage.unknown`) — the provider
+    /// affirmatively not offering the window, as opposed to a fetch failure,
+    /// whose error carries the failure message. `merged` treats the two
+    /// differently: a failure preserves the prior reading; an unreported
+    /// window displaces it. A history seed also wears the "no data" caption
+    /// but with a real percentage, so it stays a reading, not this.
+    var isUnreported: Bool { !hasReading && error == WindowUsage.unknown.error }
+
     var percentInt: Int { Int((usedPercent * 100).rounded()) }
 
     func displayedFraction(mode: UsageDisplayMode) -> Double {
@@ -53,37 +62,6 @@ struct WindowUsage {
 
     func displayedPercentInt(mode: UsageDisplayMode) -> Int {
         Int((displayedFraction(mode: mode) * 100).rounded())
-    }
-}
-
-struct CodexRateLimitWindowCandidate {
-    let usage: WindowUsage
-    let duration: TimeInterval?
-}
-
-enum CodexRateLimitWindowClassifier {
-    static func classify(
-        primary: CodexRateLimitWindowCandidate?,
-        secondary: CodexRateLimitWindowCandidate?
-    ) -> (fiveHour: WindowUsage, weekly: WindowUsage) {
-        var fiveHour = WindowUsage.unknown
-        var weekly = WindowUsage.unknown
-
-        for (index, candidate) in [primary, secondary].enumerated() {
-            guard let candidate else { continue }
-            if let duration = candidate.duration {
-                if duration >= 24 * 3600 {
-                    weekly = candidate.usage
-                } else {
-                    fiveHour = candidate.usage
-                }
-            } else if index == 0 {
-                fiveHour = candidate.usage
-            } else {
-                weekly = candidate.usage
-            }
-        }
-        return (fiveHour, weekly)
     }
 }
 
@@ -123,21 +101,18 @@ struct AppUsage {
     static func merged(
         fetched: AppUsage,
         retaining prior: AppUsage,
-        at now: Date,
-        retainMissingWindows: Bool = true
+        at now: Date
     ) -> AppUsage {
         AppUsage(
             fiveHour: carryForward(
                 fetched.fiveHour,
                 prior: prior.fiveHour,
-                at: now,
-                retainMissingWindows: retainMissingWindows
+                at: now
             ),
             weekly: carryForward(
                 fetched.weekly,
                 prior: prior.weekly,
-                at: now,
-                retainMissingWindows: retainMissingWindows
+                at: now
             ),
             // Plan tier is read from the credential store, not the usage
             // response, so a failed fetch shouldn't blank the chip's badge.
@@ -148,11 +123,15 @@ struct AppUsage {
     private static func carryForward(
         _ fetched: WindowUsage,
         prior: WindowUsage,
-        at now: Date,
-        retainMissingWindows: Bool
+        at now: Date
     ) -> WindowUsage {
         guard !fetched.hasReading, prior.hasReading else { return fetched }
-        if fetched.error == "no data", !retainMissingWindows { return fetched }
+        // A parsed response that omits the window is the provider saying the
+        // plan doesn't have one (single-window Codex plans, mid-2026) —
+        // displace the prior reading rather than papering over it. Carrying
+        // here froze a mislabeled history seed forever: seeds have no
+        // resetAt, so the release below could never fire.
+        if fetched.isUnreported { return fetched }
         if let reset = prior.resetAt, reset <= now { return fetched }
         return WindowUsage(
             usedPercent: prior.usedPercent, resetAt: prior.resetAt, error: fetched.error
