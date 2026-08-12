@@ -674,7 +674,19 @@ private struct PeekPillOverlay: View {
     private var currentWindow: (kind: UsageWindow, usage: WindowUsage) {
         switch provider {
         case .claude: return (.fiveHour, usageStore.claude.fiveHour)
-        case .codex:  return usageStore.codex.preferredWindow
+        case .codex:
+            let selected = usageStore.codex.preferredWindow
+            let resetAt = usageStore.codexResetCredits.nearestResetDate(
+                comparedTo: selected.usage.resetAt
+            )
+            return (
+                selected.kind,
+                WindowUsage(
+                    usedPercent: selected.usage.usedPercent,
+                    resetAt: resetAt,
+                    error: selected.usage.error
+                )
+            )
         }
     }
 

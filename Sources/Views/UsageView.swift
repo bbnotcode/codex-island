@@ -226,6 +226,7 @@ struct ChartTile: View {
     let windowKind: UsageWindow
     @ObservedObject private var usageDisplay = UsageDisplayModeStore.shared
     @ObservedObject private var historyStore = UsageHistoryStore.shared
+    @ObservedObject private var usageStore = UsageStore.shared
 
     /// Locked tile height across all 5 styles so the panel size is
     /// identical regardless of what the user picks.
@@ -284,7 +285,7 @@ struct ChartTile: View {
     }
 
     private func subCaption() -> String {
-        if let r = window.resetAt {
+        if let r = effectiveResetAt {
             let delta = max(0, r.timeIntervalSinceNow)
             return L10n.tr("resets in %@", Duration.compact(delta))
         }
@@ -303,7 +304,7 @@ struct ChartTile: View {
     }
 
     private func compactSubCaption() -> String {
-        if let r = window.resetAt {
+        if let r = effectiveResetAt {
             let delta = max(0, r.timeIntervalSinceNow)
             return "↻ " + Duration.compact(delta)
         }
@@ -311,5 +312,12 @@ struct ChartTile: View {
             return err
         }
         return ""
+    }
+
+    private var effectiveResetAt: Date? {
+        guard provider == .codex else { return window.resetAt }
+        return usageStore.codexResetCredits.nearestResetDate(
+            comparedTo: window.resetAt
+        )
     }
 }

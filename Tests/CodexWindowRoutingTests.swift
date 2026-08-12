@@ -109,6 +109,55 @@ struct CodexWindowRoutingTests {
         expect(fiveHourOnly.fiveHour.usedPercent == 0.55, "lone 18000s window lands in 5h")
         expect(!fiveHourOnly.weekly.hasReading, "weekly stays a no-reading window")
 
+        // MARK: reset credits can provide an earlier recovery than the window
+
+        let now = Date(timeIntervalSince1970: 1_786_464_000)
+        let earlierCredit = CodexResetCredits(
+            availableCount: 1,
+            credits: [
+                CodexResetCredit(
+                    id: "early",
+                    status: "available",
+                    expiresAt: now.addingTimeInterval(24 * 3600),
+                    title: "",
+                    description: ""
+                )
+            ]
+        )
+        expect(
+            earlierCredit.nearestResetDate(
+                comparedTo: now.addingTimeInterval(6 * 86400 + 3 * 3600),
+                now: now
+            ) == now.addingTimeInterval(24 * 3600),
+            "an earlier reset credit wins over the weekly system reset"
+        )
+        expect(
+            earlierCredit.nearestResetDate(
+                comparedTo: now.addingTimeInterval(4 * 3600),
+                now: now
+            ) == now.addingTimeInterval(4 * 3600),
+            "an earlier system reset wins over the reset credit"
+        )
+        let expiredCredit = CodexResetCredits(
+            availableCount: 1,
+            credits: [
+                CodexResetCredit(
+                    id: "expired",
+                    status: "available",
+                    expiresAt: now.addingTimeInterval(-60),
+                    title: "",
+                    description: ""
+                )
+            ]
+        )
+        expect(
+            expiredCredit.nearestResetDate(
+                comparedTo: now.addingTimeInterval(2 * 86400),
+                now: now
+            ) == now.addingTimeInterval(2 * 86400),
+            "expired reset credits are ignored"
+        )
+
         // MARK: same-kind collision — the earlier slot wins, never a silent overwrite
 
         // Speculative shape (a daily 86400s window classifies as weekly):
