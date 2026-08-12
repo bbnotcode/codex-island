@@ -27,12 +27,12 @@ final class IslandModel: ObservableObject {
     let tabWidth: CGFloat = 38
 
     /// Per-side outboard slot that houses the peek-state percentage pill.
-    /// Sized for "M/d HH:mm · 100%" at the chosen pill typography. Fixed (not
+    /// Sized for "M/d HH:mm · 100% ⚠" at the chosen pill typography. Fixed (not
     /// text-measured) so percentage updates don't jitter the silhouette
     /// width during refresh. Grown symmetrically on both sides regardless
     /// of which provider is visible — keeps the silhouette balanced over
     /// the physical notch.
-    let pillSlotWidth: CGFloat = 112
+    let pillSlotWidth: CGFloat = 136
 
     /// Visible expanded panel width.
     private let expandedWidth: CGFloat = 800

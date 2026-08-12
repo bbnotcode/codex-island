@@ -55,7 +55,7 @@ struct NotchPeekPill: View {
         .minimumScaleFactor(0.88)
         .fixedSize(horizontal: false, vertical: true)
         .frame(
-            width: showsAbsoluteResetTime ? 98 : nil,
+            width: showsAbsoluteResetTime ? 122 : nil,
             alignment: alignment == .leading ? .leading : .trailing
         )
     }
@@ -85,6 +85,7 @@ struct NotchPeekPill: View {
         Text(resetText ?? fallbackResetText)
             .font(Typography.bodyNumber)
             .foregroundStyle(.white.opacity(resetText == nil ? 0.45 : 0.70))
+            .layoutPriority(showsAbsoluteResetTime ? 1 : 0)
     }
 
     /// Brand tint by default; alert color when above threshold so the
