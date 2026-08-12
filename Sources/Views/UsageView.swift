@@ -286,8 +286,13 @@ struct ChartTile: View {
 
     private func subCaption() -> String {
         if let r = effectiveResetAt {
-            let delta = max(0, r.timeIntervalSinceNow)
-            return L10n.tr("resets in %@", Duration.compact(delta))
+            if provider == .codex {
+                return L10n.tr(
+                    "resets at %@",
+                    CodexResetCredits.localizedMinute(r, locale: L10n.locale)
+                )
+            }
+            return L10n.tr("resets in %@", Duration.compact(max(0, r.timeIntervalSinceNow)))
         }
         // "no data" is our internal sentinel for "API returned null for this
         // window" — most commonly a brand-new 5h period before the first
@@ -305,8 +310,10 @@ struct ChartTile: View {
 
     private func compactSubCaption() -> String {
         if let r = effectiveResetAt {
-            let delta = max(0, r.timeIntervalSinceNow)
-            return "↻ " + Duration.compact(delta)
+            if provider == .codex {
+                return "↻ " + CodexResetCredits.localizedMinute(r, locale: L10n.locale)
+            }
+            return "↻ " + Duration.compact(max(0, r.timeIntervalSinceNow))
         }
         if let err = window.error, err != "no data" {
             return err

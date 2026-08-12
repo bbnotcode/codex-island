@@ -101,6 +101,7 @@
 "Refresh now" = "立即刷新";
 "Refreshing…" = "正在刷新…";
 "resets in %@" = "%@ 后重置";
+"resets at %@" = "%@ 重置";
 "Resets in %@" = "%@ 后重置";
 "Restart CodexIsland to apply language?" = "重启 CodexIsland 以应用语言？";
 "Restart now" = "立即重启";

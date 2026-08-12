@@ -111,7 +111,10 @@ struct CodexResetStatus: View {
                 .foregroundStyle(.white.opacity(0.40))
             Spacer(minLength: 8)
 
-            Text(absolute(credit.expiresAt))
+            Text(CodexResetCredits.localizedMinute(
+                credit.expiresAt,
+                locale: L10n.locale
+            ))
                 .font(Typography.bodyNumber)
                 .foregroundStyle(.white.opacity(0.95))
                 .lineLimit(1)
@@ -158,15 +161,4 @@ struct CodexResetStatus: View {
         hideWorkItem = nil
     }
 
-    private static let absoluteFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.locale = L10n.locale
-        formatter.setLocalizedDateFormatFromTemplate("yMMMd")
-        return formatter
-    }()
-
-    private func absolute(_ date: Date) -> String {
-        Self.absoluteFormatter.locale = L10n.locale
-        return Self.absoluteFormatter.string(from: date)
-    }
 }

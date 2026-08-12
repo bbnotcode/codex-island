@@ -157,6 +157,15 @@ struct CodexWindowRoutingTests {
             ) == now.addingTimeInterval(2 * 86400),
             "expired reset credits are ignored"
         )
+        let shanghai = TimeZone(identifier: "Asia/Shanghai")!
+        expect(
+            CodexResetCredits.localizedMinute(
+                Date(timeIntervalSince1970: 1_786_503_420),
+                locale: Locale(identifier: "zh-Hans"),
+                timeZone: shanghai
+            ).contains("10:57"),
+            "absolute reset time is formatted to the minute in the user's time zone"
+        )
 
         // MARK: same-kind collision — the earlier slot wins, never a silent overwrite
 

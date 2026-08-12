@@ -641,7 +641,8 @@ private struct PeekPillOverlay: View {
             tint: tint,
             alignment: provider == .claude ? .leading : .trailing,
             fallbackResetText: selected.kind == .fiveHour ? "5h" : "7d",
-            severity: severity
+            severity: severity,
+            showsAbsoluteResetTime: provider == .codex
         )
         .padding(provider == .claude ? .leading : .trailing, 14)
         .padding(.top, topPadding)
@@ -714,26 +715,34 @@ private struct PeekPillOverlay: View {
     private func peekLabel(
         for window: WindowUsage,
         kind: UsageWindow,
-        provider: String
+        provider providerName: String
     ) -> String {
         let windowName = L10n.tr(kind == .fiveHour ? "5-hour" : "weekly")
         if !window.hasReading {
-            return L10n.tr("%@: no data for %@ window", provider, windowName)
+            return L10n.tr("%@: no data for %@ window", providerName, windowName)
         }
         let mode = UsageDisplayModeStore.shared.mode
         let pct = window.displayedPercentInt(mode: mode)
         guard let resetAt = window.resetAt else {
             return mode == .used
-                ? L10n.tr("%@: %d percent of %@ window used", provider, pct, windowName)
-                : L10n.tr("%@: %d percent of %@ window remaining", provider, pct, windowName)
+                ? L10n.tr("%@: %d percent of %@ window used", providerName, pct, windowName)
+                : L10n.tr("%@: %d percent of %@ window remaining", providerName, pct, windowName)
         }
-        let remaining = max(0, resetAt.timeIntervalSinceNow)
-        let resetPhrase: String = remaining >= 3600
-            ? L10n.tr("resets in %d hours", Int((remaining / 3600).rounded(.down)))
-            : L10n.tr("resets in %d minutes", max(1, Int((remaining / 60).rounded(.down))))
+        let resetPhrase: String
+        if provider == .codex {
+            resetPhrase = L10n.tr(
+                "resets at %@",
+                CodexResetCredits.localizedMinute(resetAt, locale: L10n.locale)
+            )
+        } else {
+            let remaining = max(0, resetAt.timeIntervalSinceNow)
+            resetPhrase = remaining >= 3600
+                ? L10n.tr("resets in %d hours", Int((remaining / 3600).rounded(.down)))
+                : L10n.tr("resets in %d minutes", max(1, Int((remaining / 60).rounded(.down))))
+        }
         return mode == .used
-            ? L10n.tr("%@: %d percent of %@ window used, %@", provider, pct, windowName, resetPhrase)
-            : L10n.tr("%@: %d percent of %@ window remaining, %@", provider, pct, windowName, resetPhrase)
+            ? L10n.tr("%@: %d percent of %@ window used, %@", providerName, pct, windowName, resetPhrase)
+            : L10n.tr("%@: %d percent of %@ window remaining, %@", providerName, pct, windowName, resetPhrase)
     }
 }
 

@@ -19,6 +19,7 @@ struct NotchPeekPill: View {
     let alignment: HorizontalAlignment
     var fallbackResetText = "5h"
     var severity: AlertEngine.Severity = .none
+    var showsAbsoluteResetTime = false
     @ObservedObject private var usageDisplay = UsageDisplayModeStore.shared
 
     var body: some View {
@@ -119,6 +120,12 @@ struct NotchPeekPill: View {
         guard let resetAt = usage.resetAt else { return nil }
         let remaining = resetAt.timeIntervalSinceNow
         guard remaining > 0 else { return nil }
+        if showsAbsoluteResetTime {
+            return CodexResetCredits.localizedMinute(
+                resetAt,
+                locale: L10n.locale
+            )
+        }
         return Duration.compact(remaining)
     }
 }

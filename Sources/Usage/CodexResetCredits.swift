@@ -42,4 +42,16 @@ struct CodexResetCredits: Equatable {
             .filter { $0 > now }
             .min()
     }
+
+    static func localizedMinute(
+        _ date: Date,
+        locale: Locale = .autoupdatingCurrent,
+        timeZone: TimeZone = .autoupdatingCurrent
+    ) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = locale
+        formatter.timeZone = timeZone
+        formatter.setLocalizedDateFormatFromTemplate("MMMdjm")
+        return formatter.string(from: date)
+    }
 }

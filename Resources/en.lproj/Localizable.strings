@@ -101,6 +101,7 @@
 "Refresh now" = "Refresh now";
 "Refreshing…" = "Refreshing…";
 "resets in %@" = "resets in %@";
+"resets at %@" = "resets at %@";
 "Resets in %@" = "Resets in %@";
 "Restart CodexIsland to apply language?" = "Restart CodexIsland to apply language?";
 "Restart now" = "Restart now";
