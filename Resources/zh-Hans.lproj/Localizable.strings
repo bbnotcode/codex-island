@@ -144,8 +144,13 @@
 "Completion confetti" = "完成彩带";
 "Trigger Raycast Beta confetti when a top-level task completes successfully." = "顶层任务成功完成时触发 Raycast Beta 彩带效果。";
 "%d active · %@" = "%d 个活动任务 · %@";
+"%d active · longest %@" = "%d 个活动任务 · 最长 %@";
 "%d waiting · %d running · %@" = "%d 个待审批 · %d 个运行中 · %@";
+"%d waiting · %d running · longest %@" = "%d 个待审批 · %d 个运行中 · 最长 %@";
+"%d active" = "%d 个活动任务";
+"%d waiting · %d running" = "%d 个待审批 · %d 个运行中";
 "Approval count %d" = "审批 %d";
+"Active count %d" = "运行 %d";
 "Show on" = "显示在";
 "Sparkline" = "折线";
 "Spacing" = "间距";

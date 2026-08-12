@@ -144,8 +144,13 @@
 "Completion confetti" = "Completion confetti";
 "Trigger Raycast Beta confetti when a top-level task completes successfully." = "Trigger Raycast Beta confetti when a top-level task completes successfully.";
 "%d active · %@" = "%d active · %@";
+"%d active · longest %@" = "%d active · longest %@";
 "%d waiting · %d running · %@" = "%d waiting · %d running · %@";
+"%d waiting · %d running · longest %@" = "%d waiting · %d running · longest %@";
+"%d active" = "%d active";
+"%d waiting · %d running" = "%d waiting · %d running";
 "Approval count %d" = "Approval %d";
+"Active count %d" = "Running %d";
 "Show on" = "Show on";
 "Sparkline" = "Sparkline";
 "Spacing" = "Spacing";

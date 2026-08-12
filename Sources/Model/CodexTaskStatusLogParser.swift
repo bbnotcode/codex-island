@@ -95,6 +95,10 @@ struct CodexTaskStatusLogParser {
     ].map { Data("\"\($0)\"".utf8) }
     private static let permissionRequestMarker = Data("\"request_permissions\"".utf8)
     private static let functionOutputMarker = Data("\"function_call_output\"".utf8)
+    private static let activityMarkers = [
+        "agent_message", "message", "reasoning", "function_call",
+        "custom_tool_call", "local_shell_call",
+    ].map { Data("\"\($0)\"".utf8) }
 
     private struct CacheEntry {
         let offset: UInt64
@@ -372,6 +376,11 @@ struct CodexTaskStatusLogParser {
                 if pendingPermissionCallIDs.isEmpty {
                     state = currentTurnFailed ? .error : .running
                 }
+            case .activity:
+                recognizedLifecycle = true
+                if !currentTurnFailed && pendingPermissionCallIDs.isEmpty {
+                    state = .running
+                }
             default:
                 break
             }
@@ -390,6 +399,7 @@ struct CodexTaskStatusLogParser {
         case lifecycle(String, Date?)
         case permissionRequested(String)
         case permissionResolved(String)
+        case activity
     }
 
     private static func parsedEvent(
@@ -399,7 +409,8 @@ struct CodexTaskStatusLogParser {
         guard line.count < 1_048_576,
               lifecycleMarkers.contains(where: { line.range(of: $0) != nil })
                 || line.range(of: permissionRequestMarker) != nil
-                || (expectsPermissionOutput && line.range(of: functionOutputMarker) != nil),
+                || (expectsPermissionOutput && line.range(of: functionOutputMarker) != nil)
+                || activityMarkers.contains(where: { line.range(of: $0) != nil }),
               let raw = try? JSONSerialization.jsonObject(
                 with: Data(line)
               ) as? [String: Any],
@@ -408,6 +419,7 @@ struct CodexTaskStatusLogParser {
 
         if (raw["type"] as? String) == "event_msg",
            let type = payload["type"] as? String {
+            if type == "agent_message" { return .activity }
             let startedAt = (payload["started_at"] as? Double)
                 ?? (payload["started_at"] as? Int).map(TimeInterval.init)
             return .lifecycle(
@@ -416,15 +428,22 @@ struct CodexTaskStatusLogParser {
             )
         }
         guard (raw["type"] as? String) == "response_item",
-              let type = payload["type"] as? String,
-              let callID = payload["call_id"] as? String
+              let type = payload["type"] as? String
         else { return nil }
         if type == "function_call",
-           (payload["name"] as? String) == "request_permissions" {
+           (payload["name"] as? String) == "request_permissions",
+           let callID = payload["call_id"] as? String {
             return .permissionRequested(callID)
         }
-        if type == "function_call_output", expectsPermissionOutput {
+        if type == "function_call_output", expectsPermissionOutput,
+           let callID = payload["call_id"] as? String {
             return .permissionResolved(callID)
+        }
+        if [
+            "message", "reasoning", "function_call", "custom_tool_call",
+            "local_shell_call",
+        ].contains(type) {
+            return .activity
         }
         return nil
     }

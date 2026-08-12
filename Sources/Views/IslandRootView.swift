@@ -477,11 +477,17 @@ private struct CompactCodexTaskStatusOverlay: View {
     }
 
     private var compactStatusLabel: String {
-        if store.snapshot.status == .waitingApproval,
-           store.snapshot.waitingApprovalTaskCount > 1 {
+        if store.snapshot.status == .waitingApproval {
             return L10n.tr(
                 "Approval count %d",
                 store.snapshot.waitingApprovalTaskCount
+            )
+        }
+        if store.snapshot.status == .running,
+           store.snapshot.runningTaskCount > 1 {
+            return L10n.tr(
+                "Active count %d",
+                store.snapshot.runningTaskCount
             )
         }
         return L10n.tr(store.snapshot.status.compactLabel)

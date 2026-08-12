@@ -25,13 +25,18 @@ struct CodexTaskStatusView: View {
                                 .foregroundStyle(.white.opacity(0.78))
                         }
 
-                        if store.snapshot.activeTaskCount > 0,
-                           let startedAt = store.snapshot.startedAt {
-                            TimelineView(.periodic(from: .now, by: 1)) { context in
-                                Text(activitySummary(at: context.date, startedAt: startedAt))
+                        if store.snapshot.activeTaskCount > 0 {
+                            if let startedAt = store.snapshot.startedAt {
+                                TimelineView(.periodic(from: .now, by: 1)) { context in
+                                    Text(activitySummary(at: context.date, startedAt: startedAt))
+                                }
+                                .font(Typography.caption)
+                                .foregroundStyle(.white.opacity(0.44))
+                            } else {
+                                Text(activitySummary())
+                                    .font(Typography.caption)
+                                    .foregroundStyle(.white.opacity(0.44))
                             }
-                            .font(Typography.caption)
-                            .foregroundStyle(.white.opacity(0.44))
                         } else if let updatedAt = store.snapshot.updatedAt {
                             Text(L10n.tr("Updated %@", relative(updatedAt)))
                                 .font(Typography.caption)
@@ -108,13 +113,28 @@ struct CodexTaskStatusView: View {
         let duration = Duration.compact(max(0, date.timeIntervalSince(startedAt)))
         if store.snapshot.waitingApprovalTaskCount > 0 {
             return L10n.tr(
-                "%d waiting · %d running · %@",
+                "%d waiting · %d running · longest %@",
                 store.snapshot.waitingApprovalTaskCount,
                 store.snapshot.runningTaskCount,
                 duration
             )
         }
-        return L10n.tr("%d active · %@", store.snapshot.activeTaskCount, duration)
+        return L10n.tr(
+            "%d active · longest %@",
+            store.snapshot.activeTaskCount,
+            duration
+        )
+    }
+
+    private func activitySummary() -> String {
+        if store.snapshot.waitingApprovalTaskCount > 0 {
+            return L10n.tr(
+                "%d waiting · %d running",
+                store.snapshot.waitingApprovalTaskCount,
+                store.snapshot.runningTaskCount
+            )
+        }
+        return L10n.tr("%d active", store.snapshot.activeTaskCount)
     }
 }
 

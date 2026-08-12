@@ -157,6 +157,41 @@ struct CodexTaskStatusLogParserTests {
             "unrecognized truncated tail reports unavailable"
         )
 
+        let lateTrackedTask = directory.appendingPathComponent("rollout-late-tracked.jsonl")
+        var lateTrackedData = event("task_started")
+        lateTrackedData.append(
+            event("response_item", detail: String(repeating: "x", count: 1024))
+        )
+        lateTrackedData.append(responseItem([
+            "type": "message",
+            "role": "assistant",
+            "content": [["type": "output_text", "text": "still working"]],
+        ]))
+        try lateTrackedData.write(to: lateTrackedTask)
+        expect(
+            CodexTaskStatusLogParser.parse(at: lateTrackedTask, maxBytes: 256) == .running,
+            "recent model activity identifies a late-tracked running task"
+        )
+
+        let resumedAfterCancellation = directory.appendingPathComponent(
+            "rollout-resumed-after-cancellation.jsonl"
+        )
+        var cancelledData = event("task_started")
+        cancelledData.append(event("turn_aborted"))
+        try cancelledData.write(to: resumedAfterCancellation)
+        expect(
+            CodexTaskStatusLogParser.parse(at: resumedAfterCancellation) == .cancelled,
+            "cancelled task establishes its terminal state"
+        )
+        try responseItem([
+            "type": "reasoning",
+            "summary": [],
+        ]).append(to: resumedAfterCancellation)
+        expect(
+            CodexTaskStatusLogParser.parse(at: resumedAfterCancellation) == .running,
+            "new activity after cancellation identifies a resumed task"
+        )
+
         let cachedGrowthGap = directory.appendingPathComponent("rollout-cached-growth-gap.jsonl")
         try event("task_started").write(to: cachedGrowthGap)
         expect(
