@@ -51,7 +51,21 @@ struct CodexResetCredits: Equatable {
         let formatter = DateFormatter()
         formatter.locale = locale
         formatter.timeZone = timeZone
-        formatter.setLocalizedDateFormatFromTemplate("MMMdjm")
+        formatter.setLocalizedDateFormatFromTemplate("MMMdHHmm")
+        return formatter.string(from: date)
+    }
+
+    /// Fixed-width numeric form for the narrow notch pill. Keep the date
+    /// order compact and force a 24-hour clock so localized AM/PM markers
+    /// cannot grow back across the provider logo.
+    static func compactLocalizedMinute(
+        _ date: Date,
+        timeZone: TimeZone = .autoupdatingCurrent
+    ) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = timeZone
+        formatter.dateFormat = "M/d HH:mm"
         return formatter.string(from: date)
     }
 }

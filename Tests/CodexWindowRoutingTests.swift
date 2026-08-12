@@ -166,6 +166,14 @@ struct CodexWindowRoutingTests {
             ).contains("10:57"),
             "absolute reset time is formatted to the minute in the user's time zone"
         )
+        let compactTime = CodexResetCredits.compactLocalizedMinute(
+            Date(timeIntervalSince1970: 1_786_503_420),
+            timeZone: shanghai
+        )
+        expect(
+            compactTime == "8/12 10:57",
+            "compact reset time uses a short 24-hour format"
+        )
 
         // MARK: same-kind collision — the earlier slot wins, never a silent overwrite
 

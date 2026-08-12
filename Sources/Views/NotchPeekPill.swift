@@ -52,7 +52,12 @@ struct NotchPeekPill: View {
         }
         .monospacedDigit()
         .lineLimit(1)
-        .fixedSize()
+        .minimumScaleFactor(0.88)
+        .fixedSize(horizontal: false, vertical: true)
+        .frame(
+            width: showsAbsoluteResetTime ? 98 : nil,
+            alignment: alignment == .leading ? .leading : .trailing
+        )
     }
 
     private var warningGlyph: some View {
@@ -121,10 +126,7 @@ struct NotchPeekPill: View {
         let remaining = resetAt.timeIntervalSinceNow
         guard remaining > 0 else { return nil }
         if showsAbsoluteResetTime {
-            return CodexResetCredits.localizedMinute(
-                resetAt,
-                locale: L10n.locale
-            )
+            return CodexResetCredits.compactLocalizedMinute(resetAt)
         }
         return Duration.compact(remaining)
     }
