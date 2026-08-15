@@ -110,6 +110,7 @@ target="${UPSTREAM_REMOTE}/${UPSTREAM_BRANCH}"
 
 if git merge-base --is-ancestor "$target" HEAD; then
   echo "Already up to date with ${target}."
+  run_validation
   exit 0
 fi
 
