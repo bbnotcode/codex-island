@@ -80,11 +80,17 @@ struct PanelHeader: View {
     }
 
     private var headerStatusLabel: String {
-        if taskStatus.snapshot.status == .waitingApproval,
-           taskStatus.snapshot.waitingApprovalTaskCount > 1 {
+        if taskStatus.snapshot.status == .waitingApproval {
             return L10n.tr(
                 "Approval count %d",
                 taskStatus.snapshot.waitingApprovalTaskCount
+            )
+        }
+        if taskStatus.snapshot.status == .running,
+           taskStatus.snapshot.runningTaskCount > 1 {
+            return L10n.tr(
+                "Active count %d",
+                taskStatus.snapshot.runningTaskCount
             )
         }
         return L10n.tr(taskStatus.snapshot.status.compactLabel)

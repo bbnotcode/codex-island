@@ -3,6 +3,13 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
+BUILD_LOCK="./.build.lock"
+if ! /usr/bin/shlock -p $$ -f "$BUILD_LOCK"; then
+  echo "error: another CodexIsland build is already running" >&2
+  exit 1
+fi
+trap 'rm -f "$BUILD_LOCK"' EXIT
+
 APP_NAME="CodexIsland"
 BUNDLE_ID="dev.codexisland.CodexIsland"
 VERSION="$(cat VERSION)"
@@ -120,5 +127,10 @@ for xpc in Installer.xpc Downloader.xpc; do
 done
 find "$FRAMEWORKS_DIR/Sparkle.framework" -exec xattr -cs {} \;
 codesign --force --sign - --timestamp=none "$FRAMEWORKS_DIR/Sparkle.framework"
+
+# File Provider can reattach FinderInfo while nested bundles are being signed,
+# so clear it once more after the last write. release.sh repeats this cleanup
+# immediately before distribution signing.
+xattr -cr "$APP_DIR"
 
 echo "✓ built $APP_DIR ($VERSION)"

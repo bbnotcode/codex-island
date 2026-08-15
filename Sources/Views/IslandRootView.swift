@@ -411,7 +411,7 @@ private struct CompactCodexTaskStatusOverlay: View {
                             }
                                     .font(Typography.bodyNumber)
                                     .foregroundStyle(statusColor)
-                                    .frame(width: 44, alignment: .center)
+                                    .frame(width: 50, alignment: .center)
 
                             Group {
                                 if store.displayMode == .iconAndText
@@ -425,7 +425,7 @@ private struct CompactCodexTaskStatusOverlay: View {
                                     Color.clear
                                 }
                             }
-                            .frame(width: 44, alignment: .center)
+                            .frame(width: 62, alignment: .center)
 
                             CodexTaskStatusGlyph(
                                 status: store.snapshot.status,
@@ -441,13 +441,13 @@ private struct CompactCodexTaskStatusOverlay: View {
                             Text("·")
                                 .font(Typography.bodyNumber)
                                 .foregroundStyle(.white.opacity(0.32))
-                                .offset(x: -22)
+                                .offset(x: -31)
                         }
                     }
-                    .frame(width: 132)
+                    .frame(width: 156)
                     .padding(.leading, edgePadding)
                     .padding(.top, max(0, topPadding - 1))
-                    .offset(x: -109)
+                    .offset(x: -121)
                 } else {
                     CodexTaskStatusGlyph(
                         status: store.snapshot.status,

@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 import Security
 
 /// Deep module owning Claude OAuth credential acquisition: the
@@ -282,9 +283,23 @@ enum ClaudeCredentials {
     /// Internal (not private) so ResolveUsageTests can point it at a fixture
     /// via CLAUDE_CONFIG_DIR and assert the decoded candidate.
     static func readClaudeFileCandidates() -> [KeychainCandidate] {
-        guard let data = FileManager.default.contents(atPath: claudeCredentialsFilePath()),
+        guard let data = readCredentialFile(atPath: claudeCredentialsFilePath()),
               let blob = decodeClaudeKeychainBlob(data) else { return [] }
         return [KeychainCandidate(account: NSUserName(), blob: blob)]
+    }
+
+    private static func readCredentialFile(atPath path: String) -> Data? {
+        let fm = FileManager.default
+        guard let attributes = try? fm.attributesOfItem(atPath: path),
+              attributes[.type] as? FileAttributeType == .typeRegular,
+              (attributes[.ownerAccountID] as? NSNumber)?.uint32Value == getuid(),
+              (attributes[.size] as? NSNumber)?.uint64Value ?? .max <= 1_048_576,
+              let values = try? URL(fileURLWithPath: path).resourceValues(
+                forKeys: [.isSymbolicLinkKey]
+              ),
+              values.isSymbolicLink != true
+        else { return nil }
+        return try? Data(contentsOf: URL(fileURLWithPath: path), options: .mappedIfSafe)
     }
 
     /// First candidate carrying a usable `claudeAiOauth` (non-empty access

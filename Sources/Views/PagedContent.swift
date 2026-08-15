@@ -14,6 +14,7 @@ import SwiftUI
 /// left to reveal the cost screen's edge, then settles back. Subtle and
 /// time-bounded so it stops nagging once they've discovered the gesture.
 struct PagedContent: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ObservedObject var model: IslandModel
     @ObservedObject private var screenPref = ScreenPref.shared
     @State private var peekOffset: CGFloat = 0
@@ -43,6 +44,7 @@ struct PagedContent: View {
                 // learn the second screen exists. The motion is brief
                 // (~1s total) and slow-eased.
                 guard !screenPref.hasSwipedScreen,
+                      !reduceMotion,
                       screenPref.screen == .usage
                 else { return }
                 schedulePeek()

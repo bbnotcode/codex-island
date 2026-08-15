@@ -97,7 +97,9 @@ struct CodexTaskStatusLogParser {
     private static let functionOutputMarker = Data("\"function_call_output\"".utf8)
     private static let activityMarkers = [
         "agent_message", "message", "reasoning", "function_call",
-        "custom_tool_call", "local_shell_call",
+        "function_call_output", "custom_tool_call", "custom_tool_call_output",
+        "local_shell_call", "tool_search_call", "tool_search_output",
+        "agent_reasoning", "web_search_end", "image_generation_end",
     ].map { Data("\"\($0)\"".utf8) }
 
     private struct CacheEntry {
@@ -419,7 +421,10 @@ struct CodexTaskStatusLogParser {
 
         if (raw["type"] as? String) == "event_msg",
            let type = payload["type"] as? String {
-            if type == "agent_message" { return .activity }
+            if [
+                "agent_message", "agent_reasoning", "web_search_end",
+                "image_generation_end",
+            ].contains(type) { return .activity }
             let startedAt = (payload["started_at"] as? Double)
                 ?? (payload["started_at"] as? Int).map(TimeInterval.init)
             return .lifecycle(
@@ -440,8 +445,9 @@ struct CodexTaskStatusLogParser {
             return .permissionResolved(callID)
         }
         if [
-            "message", "reasoning", "function_call", "custom_tool_call",
-            "local_shell_call",
+            "message", "reasoning", "function_call", "function_call_output",
+            "custom_tool_call", "custom_tool_call_output", "local_shell_call",
+            "tool_search_call", "tool_search_output",
         ].contains(type) {
             return .activity
         }

@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 
 enum UsageFetcher {
     // MARK: - Codex
@@ -12,6 +13,7 @@ enum UsageFetcher {
         }
 
         var req = URLRequest(url: URL(string: "https://chatgpt.com/backend-api/wham/usage")!)
+        req.timeoutInterval = 15
         req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
 
         do {
@@ -52,11 +54,25 @@ enum UsageFetcher {
 
     private static func readCodexAccessToken() -> String? {
         let path = NSString("~/.codex/auth.json").expandingTildeInPath
-        guard let data = try? Data(contentsOf: URL(fileURLWithPath: path)),
+        guard let data = readCredentialFile(atPath: path),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let tokens = json["tokens"] as? [String: Any],
               let token = tokens["access_token"] as? String else { return nil }
         return token
+    }
+
+    private static func readCredentialFile(atPath path: String) -> Data? {
+        let fm = FileManager.default
+        guard let attributes = try? fm.attributesOfItem(atPath: path),
+              attributes[.type] as? FileAttributeType == .typeRegular,
+              (attributes[.ownerAccountID] as? NSNumber)?.uint32Value == getuid(),
+              (attributes[.size] as? NSNumber)?.uint64Value ?? .max <= 1_048_576,
+              let values = try? URL(fileURLWithPath: path).resourceValues(
+                forKeys: [.isSymbolicLinkKey]
+              ),
+              values.isSymbolicLink != true
+        else { return nil }
+        return try? Data(contentsOf: URL(fileURLWithPath: path), options: .mappedIfSafe)
     }
 
     /// The window slots stopped being positional in mid-2026: plans with a
@@ -99,6 +115,7 @@ enum UsageFetcher {
         guard let token = readCodexAccessToken() else { return nil }
 
         var req = URLRequest(url: URL(string: "https://chatgpt.com/backend-api/wham/rate-limit-reset-credits")!)
+        req.timeoutInterval = 15
         req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         req.setValue("application/json", forHTTPHeaderField: "Accept")
 
@@ -162,6 +179,7 @@ enum UsageFetcher {
 
     private static func fetchClaudeUsage(token: String, plan: String?) async -> ClaudeCredentials.ProbeOutcome {
         var req = URLRequest(url: URL(string: "https://api.anthropic.com/api/oauth/usage")!)
+        req.timeoutInterval = 15
         req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         req.setValue("oauth-2025-04-20", forHTTPHeaderField: "anthropic-beta")
         req.setValue("application/json", forHTTPHeaderField: "Accept")

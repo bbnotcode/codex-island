@@ -33,20 +33,26 @@ struct CodexResetStatus: View {
     }
 
     private var badge: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "arrow.counterclockwise")
-                .font(Typography.caption)
-                .foregroundStyle(IslandColor.codex.opacity(badgeHovered || showPopover ? 1 : 0.8))
-            Text(resetAvailabilityText)
-                .font(Typography.caption)
-                .foregroundStyle(.white.opacity(badgeHovered || showPopover ? 0.85 : 0.55))
+        Button {
+            cancelHide()
+            showPopover.toggle()
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "arrow.counterclockwise")
+                    .font(Typography.caption)
+                    .foregroundStyle(IslandColor.codex.opacity(badgeHovered || showPopover ? 1 : 0.8))
+                Text(resetAvailabilityText)
+                    .font(Typography.caption)
+                    .foregroundStyle(.white.opacity(badgeHovered || showPopover ? 0.85 : 0.55))
+            }
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
+            .background(
+                RoundedRectangle(cornerRadius: 5)
+                    .fill(.white.opacity(badgeHovered || showPopover ? 0.05 : 0))
+            )
         }
-        .padding(.horizontal, 6)
-        .padding(.vertical, 3)
-        .background(
-            RoundedRectangle(cornerRadius: 5)
-                .fill(.white.opacity(badgeHovered || showPopover ? 0.05 : 0))
-        )
+        .buttonStyle(.plain)
         .contentShape(RoundedRectangle(cornerRadius: 5))
         .onHover { hovered in
             badgeHovered = hovered
@@ -54,7 +60,8 @@ struct CodexResetStatus: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(resetAvailabilityAccessibilityLabel)
-        .accessibilityHint(L10n.tr("Hover to show reset expiration details"))
+        .accessibilityHint(L10n.tr("Show reset expiration details"))
+        .accessibilityValue(showPopover ? L10n.tr("Expanded") : L10n.tr("Collapsed"))
         .animation(.hoverFade, value: badgeHovered)
         .animation(.hoverFade, value: showPopover)
     }

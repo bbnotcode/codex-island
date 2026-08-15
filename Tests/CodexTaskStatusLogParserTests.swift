@@ -192,6 +192,22 @@ struct CodexTaskStatusLogParserTests {
             "new activity after cancellation identifies a resumed task"
         )
 
+        let toolOutputOnly = directory.appendingPathComponent("rollout-tool-output-only.jsonl")
+        var toolOutputData = event("task_started")
+        toolOutputData.append(
+            event("response_item", detail: String(repeating: "x", count: 1024))
+        )
+        toolOutputData.append(responseItem([
+            "type": "custom_tool_call_output",
+            "call_id": "call-output",
+            "output": "done",
+        ]))
+        try toolOutputData.write(to: toolOutputOnly)
+        expect(
+            CodexTaskStatusLogParser.parse(at: toolOutputOnly, maxBytes: 256) == .running,
+            "recent tool output identifies a late-tracked running task"
+        )
+
         let cachedGrowthGap = directory.appendingPathComponent("rollout-cached-growth-gap.jsonl")
         try event("task_started").write(to: cachedGrowthGap)
         expect(
