@@ -85,6 +85,12 @@ struct AppUsage {
         return (.weekly, weekly)
     }
 
+    var peekWindow: WindowUsage { preferredWindow.usage }
+
+    /// Which window `peekWindow` selected — the peek chrome (VoiceOver label,
+    /// window-length fallback glyph) must describe the same window it shows.
+    var peekWindowIsWeekly: Bool { preferredWindow.kind == .weekly }
+
     /// Fold a fetch result into the values currently on screen.
     ///
     /// Per window: a fresh reading wins outright. A failed window keeps the
