@@ -16,7 +16,7 @@ struct NumericChart: View {
                 Spacer()
                 Text(sub)
                     .font(Typography.caption)
-                    .foregroundStyle(Color.primary.opacity(0.52))
+                    .foregroundStyle(Color.primary.opacity(0.68))
             }
             HStack(alignment: .firstTextBaseline, spacing: 2) {
                 Text("\(Int(value))")

@@ -33,7 +33,7 @@ struct ChartFoot: View {
     var body: some View {
         Text(caption)
             .font(Typography.caption)
-            .foregroundStyle(Color.primary.opacity(0.52))
+            .foregroundStyle(Color.primary.opacity(0.64))
             .lineLimit(1)
             .truncationMode(.tail)
             .frame(maxWidth: .infinity, alignment: .leading)

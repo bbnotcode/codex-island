@@ -43,7 +43,7 @@ struct RingChart: View {
             }
             Text(sub)
                 .font(Typography.caption)
-                .foregroundStyle(Color.primary.opacity(0.4))
+                .foregroundStyle(Color.primary.opacity(0.60))
                 .lineLimit(1)
                 .truncationMode(.tail)
         }
