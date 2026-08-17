@@ -25,7 +25,7 @@ struct PageIndicator: View {
             model.showScreen(screen)
         } label: {
             Circle()
-                .fill(.white.opacity(isActive ? 0.82 : 0.25))
+                .fill(Color.primary.opacity(isActive ? 0.82 : 0.25))
                 .frame(width: isActive ? 8 : 7, height: isActive ? 8 : 7)
                 .frame(width: 24, height: 24)
                 .contentShape(Rectangle())

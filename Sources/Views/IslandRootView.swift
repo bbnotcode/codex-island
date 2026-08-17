@@ -574,11 +574,10 @@ private struct GlowLayer: View {
     }
 }
 
-/// The expanded dashboard was originally authored against a dark canvas and
-/// contains deliberate white-opacity hierarchy throughout its charts. This
-/// paired transform maps that hierarchy onto a light canvas while rotating
-/// chromatic accents back to their original hue. It is scoped to expanded
-/// content only, leaving compact/peek chrome and provider logos untouched.
+/// Gives expanded content a real semantic color scheme. Compact and peek
+/// remain dark; expanded descendants resolve `Color.primary` and related
+/// hierarchy against the selected light/dark surface without altering brand
+/// or status hues.
 private struct ExpandedContentAppearance: ViewModifier {
     let usesLightPalette: Bool
 
@@ -586,10 +585,9 @@ private struct ExpandedContentAppearance: ViewModifier {
     func body(content: Content) -> some View {
         if usesLightPalette {
             content
-                .colorInvert()
-                .hueRotation(.degrees(180))
+                .environment(\.colorScheme, .light)
         } else {
-            content
+            content.environment(\.colorScheme, .dark)
         }
     }
 }

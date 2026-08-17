@@ -17,12 +17,12 @@ struct CodexTaskStatusView: View {
                         if store.displayMode == .iconAndText {
                             Text(L10n.tr(store.snapshot.status.label))
                                 .font(Typography.providerTitle)
-                                .foregroundStyle(.white.opacity(0.94))
+                                .foregroundStyle(Color.primary.opacity(0.94))
                                 .transition(.opacity.combined(with: .scale(scale: 0.96)))
                         } else {
                             Text("Codex")
                                 .font(Typography.providerTitle)
-                                .foregroundStyle(.white.opacity(0.78))
+                                .foregroundStyle(Color.primary.opacity(0.78))
                         }
 
                         if store.snapshot.activeTaskCount > 0 {
@@ -31,16 +31,16 @@ struct CodexTaskStatusView: View {
                                     Text(activitySummary(at: context.date, startedAt: startedAt))
                                 }
                                 .font(Typography.caption)
-                                .foregroundStyle(.white.opacity(0.58))
+                                .foregroundStyle(Color.primary.opacity(0.58))
                             } else {
                                 Text(activitySummary())
                                     .font(Typography.caption)
-                                    .foregroundStyle(.white.opacity(0.58))
+                                    .foregroundStyle(Color.primary.opacity(0.58))
                             }
                         } else if let updatedAt = store.snapshot.updatedAt {
                             Text(L10n.tr("Updated %@", relative(updatedAt)))
                                 .font(Typography.caption)
-                                .foregroundStyle(.white.opacity(0.52))
+                                .foregroundStyle(Color.primary.opacity(0.52))
                         }
                     }
 
@@ -48,7 +48,7 @@ struct CodexTaskStatusView: View {
 
                     Image(systemName: "arrow.up.forward.app")
                         .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(.white.opacity(hovered ? 0.72 : 0.30))
+                        .foregroundStyle(Color.primary.opacity(hovered ? 0.72 : 0.30))
                 }
 
                 statusRail

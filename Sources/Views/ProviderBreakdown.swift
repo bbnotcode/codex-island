@@ -195,7 +195,7 @@ struct PerModelBreakdown: View {
                 Spacer(minLength: 0)
                 Text(L10n.tr("no %@ activity in last 5h or this week", providerLowerLabel(provider)))
                     .font(Typography.caption)
-                    .foregroundStyle(.white.opacity(0.4))
+                    .foregroundStyle(Color.primary.opacity(0.4))
                 Spacer(minLength: 0)
             } else {
                 VStack(spacing: 5) {
@@ -236,7 +236,7 @@ struct PerModelBreakdown: View {
             Text(L10n.tr("BY MODEL"))
                 .font(Typography.sectionLabel)
                 .tracking(0.6)
-                .foregroundStyle(.white.opacity(0.55))
+                .foregroundStyle(Color.primary.opacity(0.55))
             Spacer(minLength: 0)
             HStack(spacing: 4) {
                 Capsule()
@@ -244,14 +244,14 @@ struct PerModelBreakdown: View {
                     .frame(width: 8, height: 4)
                 Text(L10n.tr("5h"))
                     .font(Typography.caption)
-                    .foregroundStyle(.white.opacity(0.50))
+                    .foregroundStyle(Color.primary.opacity(0.50))
                     .padding(.trailing, 4)
                 Capsule()
                     .fill(color.opacity(topWeight * dimFillMultiplier))
                     .frame(width: 8, height: 4)
                 Text(L10n.tr("week"))
                     .font(Typography.caption)
-                    .foregroundStyle(.white.opacity(0.50))
+                    .foregroundStyle(Color.primary.opacity(0.50))
             }
         }
     }
@@ -286,7 +286,7 @@ private struct PerModelRow: View {
         HStack(spacing: 8) {
             Text(displayName)
                 .font(Typography.label)
-                .foregroundStyle(.white.opacity(0.78))
+                .foregroundStyle(Color.primary.opacity(0.78))
                 .frame(width: Self.nameWidth, alignment: .leading)
                 .lineLimit(1)
 
@@ -299,7 +299,7 @@ private struct PerModelRow: View {
 
             Text(trailingValue)
                 .font(Typography.caption)
-                .foregroundStyle(.white.opacity(weekAbsolute > 0 ? 0.55 : 0.32))
+                .foregroundStyle(Color.primary.opacity(weekAbsolute > 0 ? 0.55 : 0.32))
                 .frame(width: Self.trailingWidth, alignment: .trailing)
         }
     }
@@ -348,7 +348,7 @@ private struct OverlapBar: View {
                 : 0
             ZStack(alignment: .leading) {
                 Capsule()
-                    .fill(.white.opacity(0.06))
+                    .fill(Color.primary.opacity(0.06))
                     .frame(height: Self.barHeight)
                 if weekAbsolute > 0 {
                     // Floor the dim opacity so the 4th-row track baseline
@@ -392,10 +392,10 @@ struct BothHiddenPlaceholder: View {
             Spacer(minLength: 0)
             Text(L10n.tr("Both providers hidden"))
                 .font(Typography.providerTitle)
-                .foregroundStyle(.white.opacity(0.45))
+                .foregroundStyle(Color.primary.opacity(0.45))
             Text(L10n.tr("Re-enable in Settings → Providers"))
                 .font(Typography.caption)
-                .foregroundStyle(.white.opacity(0.32))
+                .foregroundStyle(Color.primary.opacity(0.32))
             Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

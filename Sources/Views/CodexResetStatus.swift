@@ -43,13 +43,13 @@ struct CodexResetStatus: View {
                     .foregroundStyle(IslandColor.codex.opacity(badgeHovered || showPopover ? 1 : 0.8))
                 Text(resetAvailabilityText)
                     .font(Typography.caption)
-                    .foregroundStyle(.white.opacity(badgeHovered || showPopover ? 0.85 : 0.55))
+                    .foregroundStyle(Color.primary.opacity(badgeHovered || showPopover ? 0.85 : 0.55))
             }
             .padding(.horizontal, 6)
             .padding(.vertical, 3)
             .background(
                 RoundedRectangle(cornerRadius: 5)
-                    .fill(.white.opacity(badgeHovered || showPopover ? 0.05 : 0))
+                    .fill(Color.primary.opacity(badgeHovered || showPopover ? 0.05 : 0))
             )
         }
         .buttonStyle(.plain)
@@ -92,11 +92,11 @@ struct CodexResetStatus: View {
                 .fill(.black)
                 .overlay(
                     RoundedRectangle(cornerRadius: 10)
-                        .fill(.white.opacity(0.04))
+                        .fill(Color.primary.opacity(0.04))
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 10)
-                        .strokeBorder(.white.opacity(0.10), lineWidth: 0.5)
+                        .strokeBorder(Color.primary.opacity(0.10), lineWidth: 0.5)
                 )
         )
         .shadow(color: .black.opacity(0.5), radius: 16, y: 8)
@@ -115,7 +115,7 @@ struct CodexResetStatus: View {
             Text(L10n.tr("EXPIRES"))
                 .font(Typography.sectionLabel)
                 .tracking(0.8)
-                .foregroundStyle(.white.opacity(0.40))
+                .foregroundStyle(Color.primary.opacity(0.40))
             Spacer(minLength: 8)
 
             Text(CodexResetCredits.localizedMinute(
@@ -123,7 +123,7 @@ struct CodexResetStatus: View {
                 locale: L10n.locale
             ))
                 .font(Typography.bodyNumber)
-                .foregroundStyle(.white.opacity(0.95))
+                .foregroundStyle(Color.primary.opacity(0.95))
                 .lineLimit(1)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -131,7 +131,7 @@ struct CodexResetStatus: View {
         .padding(.vertical, 6)
         .background(
             RoundedRectangle(cornerRadius: 6)
-                .fill(.white.opacity(0.05))
+                .fill(Color.primary.opacity(0.05))
         )
     }
 
