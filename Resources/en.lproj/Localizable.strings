@@ -201,6 +201,7 @@
 "Click to expand. Command-click to cycle visualization." = "Click to expand. Command-click to cycle visualization.";
 "Command-click to cycle visualization." = "Command-click to cycle visualization.";
 "Hover to peek usage. Click to expand. Command-click to cycle visualization." = "Hover to peek usage. Click to expand. Command-click to cycle visualization.";
+"Hover to expand. Move away to collapse." = "Hover to expand. Move away to collapse.";
 "Hover to show reset expiration details" = "Hover to show reset expiration details";
 "Show reset expiration details" = "Show reset expiration details";
 "Expanded" = "Expanded";
