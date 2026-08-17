@@ -8,6 +8,12 @@ enum IslandColor {
         dark: NSColor(calibratedRed: 0.020, green: 0.020, blue: 0.027, alpha: 1)
     )
 
+    /// Expanded island surface in Light appearance. Compact and peek states
+    /// deliberately stay black so the notch silhouette remains unchanged.
+    static let expandedLightBackground = Color(
+        nsColor: NSColor(calibratedWhite: 0.955, alpha: 1)
+    )
+
     /// #0047AB — loading sweep, glow halo.
     static let cobalt = Color(red: 0/255, green: 71/255, blue: 171/255)
 
