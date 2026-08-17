@@ -20,6 +20,7 @@ struct PanelFooter: View {
     @ObservedObject private var screenPref = ScreenPref.shared
     @ObservedObject private var usageStore = UsageStore.shared
     @ObservedObject private var costStore = CostStore.shared
+    @ObservedObject private var currencyStore = CurrencyStore.shared
     @State private var liveStatusHovered = false
 
     var body: some View {
@@ -90,7 +91,10 @@ struct PanelFooter: View {
         let label: String = {
             switch screenPref.screen {
             case .usage: return pref.style.label.uppercased()
-            case .cost:  return costPref.style.label
+            case .cost:
+                return costPref.style == .dollar
+                    ? currencyStore.currency.rawValue
+                    : costPref.style.label
             case .overview: return currentYearString
             }
         }()
@@ -111,6 +115,7 @@ struct PanelFooter: View {
             .contentTransition(.opacity)
             .animation(.strongEaseOut, value: pref.style)
             .animation(.strongEaseOut, value: costPref.style)
+            .animation(.strongEaseOut, value: currencyStore.currency)
             .animation(.strongEaseOut, value: screenPref.screen)
     }
 

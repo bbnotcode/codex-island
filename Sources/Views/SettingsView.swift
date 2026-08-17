@@ -22,6 +22,7 @@ struct SettingsView: View {
     @ObservedObject private var appLanguage = AppLanguageStore.shared
     @ObservedObject private var usage = UsageStore.shared
     @ObservedObject private var cost = CostStore.shared
+    @ObservedObject private var currencyStore = CurrencyStore.shared
     @ObservedObject private var updater = UpdaterController.shared
 
     @AppStorage("Settings.activeTab") private var activeTabRaw: String = SettingsTab.general.rawValue
@@ -560,9 +561,9 @@ struct SettingsView: View {
         )
     }
 
-    /// Single-row Cost section. Re-uses the section-label typography on the
-    /// left and inlines the freshness caption + refresh button on the right
-    /// — compact so it sits cleanly under the Providers list.
+    /// Compact Cost section with the rate attribution kept under the
+    /// freshness caption, so the currency picker remains usable in the
+    /// settings window's narrowest supported width.
     private var costSection: some View {
         HStack(alignment: .center, spacing: 10) {
             Text(L10n.tr("Cost"))
@@ -571,13 +572,32 @@ struct SettingsView: View {
                 .textCase(.uppercase)
                 .foregroundStyle(.white.opacity(0.34))
 
-            Text(costSubtitle())
-                .font(Typography.label)
-                .foregroundStyle(.white.opacity(0.42))
-                .lineLimit(1)
-                .truncationMode(.tail)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(costSubtitle())
+                    .font(Typography.label)
+                    .foregroundStyle(.white.opacity(0.42))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+
+                Link(
+                    L10n.tr("Rates by ExchangeRate-API"),
+                    destination: URL(string: "https://www.exchangerate-api.com")!
+                )
+                .font(Typography.micro)
+                .foregroundStyle(.white.opacity(0.34))
+            }
 
             Spacer(minLength: 8)
+
+            Picker("", selection: $currencyStore.currency) {
+                ForEach(DisplayCurrency.allCases) { currency in
+                    Text(currency.menuLabel).tag(currency)
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
+            .fixedSize()
+            .accessibilityLabel(L10n.tr("Display currency"))
 
             PillButton(
                 label: cost.loading ? "Refreshing…" : "Refresh",
@@ -597,12 +617,18 @@ struct SettingsView: View {
     }()
 
     private func costSubtitle() -> String {
+        if currencyStore.refreshing {
+            return L10n.tr("updating exchange rate…")
+        }
         if cost.loading {
             return L10n.tr("scanning local logs…")
         }
         if let updated = cost.lastUpdated {
             let relative = Self.relativeFormatter.localizedString(for: updated, relativeTo: Date())
-            return L10n.tr("last scan %@", relative)
+            if currencyStore.currency == .usd {
+                return L10n.tr("last scan %@", relative)
+            }
+            return L10n.tr("last scan %@ · estimated %@", relative, currencyStore.currency.rawValue)
         }
         return L10n.tr("swipe panel to view")
     }

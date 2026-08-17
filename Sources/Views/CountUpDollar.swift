@@ -11,6 +11,7 @@ import SwiftUI
 /// finishes.
 struct CountUpDollar: View {
     let target: Double
+    let wholeUnits: Bool
     let color: Color
     let glowOpacity: Double
 
@@ -95,7 +96,8 @@ struct CountUpDollar: View {
     /// Cents under $100 (where they're meaningful); rounded above so a
     /// 7-digit month total fits the 38pt slot.
     private func formatted(_ v: Double) -> String {
-        if v < 100 { return String(format: "%.2f", v) }
-        return String(format: "%.0f", v)
+        if wholeUnits || v >= 100 { return String(format: "%.0f", v) }
+        if v >= 10 { return String(format: "%.1f", v) }
+        return String(format: "%.2f", v)
     }
 }
