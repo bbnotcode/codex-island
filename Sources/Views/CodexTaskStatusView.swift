@@ -31,16 +31,16 @@ struct CodexTaskStatusView: View {
                                     Text(activitySummary(at: context.date, startedAt: startedAt))
                                 }
                                 .font(Typography.caption)
-                                .foregroundStyle(.white.opacity(0.44))
+                                .foregroundStyle(.white.opacity(0.58))
                             } else {
                                 Text(activitySummary())
                                     .font(Typography.caption)
-                                    .foregroundStyle(.white.opacity(0.44))
+                                    .foregroundStyle(.white.opacity(0.58))
                             }
                         } else if let updatedAt = store.snapshot.updatedAt {
                             Text(L10n.tr("Updated %@", relative(updatedAt)))
                                 .font(Typography.caption)
-                                .foregroundStyle(.white.opacity(0.38))
+                                .foregroundStyle(.white.opacity(0.52))
                         }
                     }
 
@@ -76,7 +76,7 @@ struct CodexTaskStatusView: View {
                     size: 19,
                     showsBackground: status == store.snapshot.status
                 )
-                .opacity(status == store.snapshot.status ? 1 : 0.28)
+                .opacity(status == store.snapshot.status ? 1 : 0.38)
                 .frame(maxWidth: .infinity)
                 .help(L10n.tr(status.label))
             }
@@ -85,11 +85,7 @@ struct CodexTaskStatusView: View {
         .padding(.vertical, 2)
         .background {
             Capsule()
-                .fill(.black.opacity(0.22))
-                .overlay {
-                    Capsule()
-                        .strokeBorder(.white.opacity(0.055), lineWidth: 0.5)
-                }
+                .fill(statusColor.opacity(0.045))
         }
         .accessibilityHidden(true)
     }

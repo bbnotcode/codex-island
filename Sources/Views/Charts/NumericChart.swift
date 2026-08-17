@@ -11,12 +11,12 @@ struct NumericChart: View {
             HStack(alignment: .firstTextBaseline) {
                 Text(label)
                     .font(Typography.label)
-                    .foregroundStyle(.white.opacity(0.55))
+                    .foregroundStyle(.white.opacity(0.78))
                     .textCase(.lowercase)
                 Spacer()
                 Text(sub)
                     .font(Typography.caption)
-                    .foregroundStyle(.white.opacity(0.4))
+                    .foregroundStyle(.white.opacity(0.52))
             }
             HStack(alignment: .firstTextBaseline, spacing: 2) {
                 Text("\(Int(value))")
@@ -26,7 +26,7 @@ struct NumericChart: View {
                     .animation(.strongEaseOut, value: value)
                 Text("%")
                     .font(Typography.unit)
-                    .foregroundStyle(.white.opacity(0.4))
+                    .foregroundStyle(.white.opacity(0.58))
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             // Thin 3pt meter underneath echoes the value at a glance and
