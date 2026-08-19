@@ -18,6 +18,10 @@ struct NotchPeekPill: View {
     let tint: Color
     let alignment: HorizontalAlignment
     var severity: AlertEngine.Severity = .none
+    /// Window-length glyph shown when no active countdown is known — must
+    /// match the window actually displayed ("5h", or "7d" for the Codex
+    /// weekly fallback on weekly-only plans).
+    var windowLengthFallback: String = "5h"
     @ObservedObject private var usageDisplay = UsageDisplayModeStore.shared
 
     var body: some View {
@@ -75,7 +79,7 @@ struct NotchPeekPill: View {
     /// window" label from an active "5h until reset" countdown — same
     /// glyph shape, weaker visual presence.
     private var resetLabel: some View {
-        Text(resetText ?? "5h")
+        Text(resetText ?? windowLengthFallback)
             .font(Typography.bodyNumber)
             .foregroundStyle(.white.opacity(resetText == nil ? 0.45 : 0.70))
     }
@@ -90,10 +94,6 @@ struct NotchPeekPill: View {
         }
     }
 
-    private var hasValue: Bool {
-        usage.usedPercent > 0 || usage.error == nil
-    }
-
     /// Spinner only fires for the cold-start case (loading AND we have nothing
     /// to show). If we have a prior value, keep showing it during refresh —
     /// same principle as UsageStore.isErrorOnly's "don't blank the panel" rule.
@@ -102,12 +102,13 @@ struct NotchPeekPill: View {
     }
 
     private var showDash: Bool {
-        // "no data" is our sentinel for "API returned null for this window"
-        // (typically a fresh 5h period before the first OAuth call lands).
-        // Treat it as a passive non-error so the pill still renders with
-        // the 5h window-length fallback instead of collapsing to "—%".
-        guard let err = usage.error, err != "no data" else { return false }
-        return usage.usedPercent == 0
+        // No measurement to show — a failed fetch, or a window the parsed
+        // response doesn't report at all (permanent on single-window Codex
+        // plans since mid-2026). The old "no data" carve-out rendered the
+        // sentinel as a value, which fabricated a steady "0% · 5h" — a full
+        // budget under the `remaining` toggle — for a window the plan
+        // doesn't have.
+        !usage.hasReading
     }
 
     private var percentText: String {

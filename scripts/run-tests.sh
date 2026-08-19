@@ -41,6 +41,29 @@ swiftc \
 
 swiftc \
   -parse-as-library \
+  -o "$OUT_DIR/wake-recovery-tests" \
+  Sources/Model/UsageDisplayModeStore.swift \
+  Sources/Usage/AppUsage.swift \
+  Sources/Usage/ClaudeCredentials.swift \
+  Sources/Usage/WakeScheduling.swift \
+  Tests/WakeRecoveryTests.swift
+
+"$OUT_DIR/wake-recovery-tests"
+
+swiftc \
+  -parse-as-library \
+  -o "$OUT_DIR/codex-window-routing-tests" \
+  Sources/Model/UsageDisplayModeStore.swift \
+  Sources/Usage/AppUsage.swift \
+  Sources/Usage/ClaudeCredentials.swift \
+  Sources/Usage/CodexResetCredits.swift \
+  Sources/Usage/UsageFetcher.swift \
+  Tests/CodexWindowRoutingTests.swift
+
+"$OUT_DIR/codex-window-routing-tests"
+
+swiftc \
+  -parse-as-library \
   -o "$OUT_DIR/pricing-tests" \
   Sources/Cost/TokenEvent.swift \
   Sources/Cost/PricingCatalog.swift \
