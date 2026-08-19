@@ -187,7 +187,9 @@ runs as an accessory app with no Dock icon and no menu bar.
   light/dark/system appearance, Always show usage, Low Power Mode,
   configurable limit alerts, and Sparkle update controls.
 - **Display:** used/remaining percentages, Usage and Cost visualization styles,
-  target display, and island width on non-notched screens.
+  target display, and island width on non-notched screens. Light appearance
+  applies a true semantic light palette to the expanded dashboard while the
+  compact and peek silhouettes remain black.
 - **Providers:** Claude/Codex visibility and status, token-counting mode, and a
   manual refresh for local cost data.
 
