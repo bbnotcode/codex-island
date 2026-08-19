@@ -161,7 +161,9 @@ the first peek. Opening Settings also triggers a fresh fetch.
 ## Using the app
 
 - Hover the notch to peek at the current 5-hour usage.
-- Click the island to expand the full panel.
+- Hover over the island to expand the full panel. Moving the pointer away
+  collapses it after a 1.5-second grace period; clicking remains available as
+  a fallback.
 - Swipe horizontally on the panel (or use the indicator dots) to move between
   **Usage**, **Cost**, and **Overview**.
 - Move away to collapse it.
