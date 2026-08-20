@@ -277,7 +277,14 @@ struct IslandRootView: View {
         // Invalidates any delayed collapse that was scheduled on a brief
         // pointer exit while the shape was morphing.
         collapseRequest = UUID()
-        guard model.state != .expanded else { return }
+        if model.state == .expanded {
+            if !contentVisible {
+                withAnimation(.strongEaseOut) {
+                    contentVisible = true
+                }
+            }
+            return
+        }
 
         withAnimation(.easeOut(duration: 0.08)) {
             pillsVisible = false
@@ -322,9 +329,9 @@ struct IslandRootView: View {
         switch model.state {
         case .compact:
             return alwaysShow.enabled
-                ? L10n.tr("Hover to expand. Move away to collapse.")
-                : L10n.tr("Hover to expand. Move away to collapse.")
-        case .peek:     return L10n.tr("Hover to expand. Move away to collapse.")
+                ? L10n.tr("Hover or activate to expand. Move away to collapse.")
+                : L10n.tr("Hover or activate to expand. Move away to collapse.")
+        case .peek:     return L10n.tr("Hover or activate to expand. Move away to collapse.")
         case .expanded:
             return ScreenPref.shared.screen == .overview
                 ? L10n.tr("Swipe to change pages.")
