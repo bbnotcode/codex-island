@@ -12,7 +12,9 @@ struct CostStylePicker: View {
         HStack(spacing: 6) {
             ForEach(CostStyle.allCases, id: \.self) { style in
                 StyleTile(
-                    displayLabel: style == .dollar ? currencyStore.currency.rawValue : style.label,
+                    displayLabel: style == .dollar
+                        ? currencyStore.displayCurrency.rawValue
+                        : style.label,
                     isOn: style == selected,
                     action: {
                         selected = style

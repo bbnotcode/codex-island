@@ -89,12 +89,16 @@ final class CurrencyStore: ObservableObject {
         usd * usdRate
     }
 
+    var displayCurrency: DisplayCurrency {
+        hasUsableRate ? currency : .usd
+    }
+
     var displaySymbol: String {
-        hasUsableRate ? currency.symbol : DisplayCurrency.usd.symbol
+        displayCurrency.symbol
     }
 
     var displayUsesWholeUnits: Bool {
-        hasUsableRate ? currency.usesWholeUnits : false
+        displayCurrency.usesWholeUnits
     }
 
     private var hasUsableRate: Bool {

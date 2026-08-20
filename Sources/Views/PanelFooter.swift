@@ -93,7 +93,7 @@ struct PanelFooter: View {
             case .usage: return pref.style.label.uppercased()
             case .cost:
                 return costPref.style == .dollar
-                    ? currencyStore.currency.rawValue
+                    ? currencyStore.displayCurrency.rawValue
                     : costPref.style.label
             case .overview: return currentYearString
             }

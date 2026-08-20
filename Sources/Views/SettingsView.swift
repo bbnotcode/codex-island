@@ -579,12 +579,14 @@ struct SettingsView: View {
                     .lineLimit(1)
                     .truncationMode(.tail)
 
-                Link(
-                    L10n.tr("Rates by ExchangeRate-API"),
-                    destination: URL(string: "https://www.exchangerate-api.com")!
-                )
-                .font(Typography.micro)
-                .foregroundStyle(.white.opacity(0.34))
+                if let attributionURL = URL(string: "https://www.exchangerate-api.com") {
+                    Link(
+                        L10n.tr("Rates by ExchangeRate-API"),
+                        destination: attributionURL
+                    )
+                    .font(Typography.micro)
+                    .foregroundStyle(.white.opacity(0.34))
+                }
             }
 
             Spacer(minLength: 8)
@@ -625,10 +627,14 @@ struct SettingsView: View {
         }
         if let updated = cost.lastUpdated {
             let relative = Self.relativeFormatter.localizedString(for: updated, relativeTo: Date())
-            if currencyStore.currency == .usd {
+            if currencyStore.displayCurrency == .usd {
                 return L10n.tr("last scan %@", relative)
             }
-            return L10n.tr("last scan %@ · estimated %@", relative, currencyStore.currency.rawValue)
+            return L10n.tr(
+                "last scan %@ · estimated %@",
+                relative,
+                currencyStore.displayCurrency.rawValue
+            )
         }
         return L10n.tr("swipe panel to view")
     }
