@@ -577,7 +577,7 @@ struct SettingsView: View {
             .opacity(codexTaskStatus.enabled ? 1 : 0.4)
             SettingsRow(
                 title: "Completion confetti",
-                subtitle: "Trigger Raycast Beta confetti when a top-level task completes successfully."
+                subtitle: "Trigger Raycast confetti when a top-level task completes successfully."
             ) {
                 SettingsToggle(isOn: codexTaskStatus.confettiEnabled) {
                     codexTaskStatus.confettiEnabled.toggle()
@@ -669,9 +669,12 @@ struct SettingsView: View {
             .accessibilityLabel(L10n.tr("Display currency"))
 
             PillButton(
-                label: cost.loading ? "Refreshing…" : "Refresh",
-                isLoading: cost.loading
-            ) { cost.refresh() }
+                label: cost.loading || currencyStore.refreshing ? "Refreshing…" : "Refresh",
+                isLoading: cost.loading || currencyStore.refreshing
+            ) {
+                cost.refresh()
+                currencyStore.refresh()
+            }
         }
         .padding(.horizontal, 24)
         .padding(.top, 14)

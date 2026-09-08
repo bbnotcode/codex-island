@@ -3,6 +3,7 @@ import SwiftUI
 struct CodexResetStatus: View {
     @ObservedObject private var usageStore = UsageStore.shared
     @ObservedObject private var visibility = ProviderVisibilityStore.shared
+    @Environment(\.colorScheme) private var colorScheme
 
     @State private var showPopover = false
     @State private var badgeHovered = false
@@ -89,7 +90,7 @@ struct CodexResetStatus: View {
         .frame(width: 210, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 10)
-                .fill(.black)
+                .fill(colorScheme == .light ? IslandColor.expandedLightBackground : .black)
                 .overlay(
                     RoundedRectangle(cornerRadius: 10)
                         .fill(Color.primary.opacity(0.04))

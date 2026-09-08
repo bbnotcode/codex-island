@@ -62,7 +62,11 @@ final class CurrencyStore: ObservableObject {
         didSet {
             UserDefaults.standard.set(currency.rawValue, forKey: Self.selectionKey)
             applyCachedRate()
-            Task { await refreshIfNeeded(force: true) }
+            refreshTask?.cancel()
+            let requestedCurrency = currency
+            refreshTask = Task {
+                await refreshIfNeeded(force: true, for: requestedCurrency)
+            }
         }
     }
 
@@ -82,7 +86,8 @@ final class CurrencyStore: ObservableObject {
             cache = [:]
         }
         applyCachedRate()
-        Task { await refreshIfNeeded() }
+        let initialCurrency = currency
+        refreshTask = Task { await refreshIfNeeded(for: initialCurrency) }
     }
 
     func converted(usd: Double) -> Double {
@@ -124,13 +129,17 @@ final class CurrencyStore: ObservableObject {
 
     func refresh() {
         refreshTask?.cancel()
-        refreshTask = Task { await refreshIfNeeded(force: true) }
+        let requestedCurrency = currency
+        refreshTask = Task {
+            await refreshIfNeeded(force: true, for: requestedCurrency)
+        }
     }
 
     private func applyCachedRate() {
         if currency == .usd {
             usdRate = 1
             lastUpdated = nil
+            refreshing = false
         } else if let cached = cache[currency.rawValue] {
             usdRate = cached.rate
             lastUpdated = cached.fetchedAt
@@ -142,14 +151,16 @@ final class CurrencyStore: ObservableObject {
         }
     }
 
-    private func refreshIfNeeded(force: Bool = false) async {
-        guard currency != .usd else { return }
-        if !force, let cached = cache[currency.rawValue],
+    private func refreshIfNeeded(
+        force: Bool = false,
+        for requestedCurrency: DisplayCurrency
+    ) async {
+        guard requestedCurrency != .usd else { return }
+        if !force, let cached = cache[requestedCurrency.rawValue],
            Date().timeIntervalSince(cached.fetchedAt) < Self.refreshInterval {
             return
         }
 
-        let requested = currency
         guard let url = URL(string: "https://open.er-api.com/v6/latest/USD") else {
             return
         }
@@ -157,8 +168,13 @@ final class CurrencyStore: ObservableObject {
         request.timeoutInterval = 15
         request.setValue("application/json", forHTTPHeaderField: "Accept")
 
+        guard currency == requestedCurrency, !Task.isCancelled else { return }
         refreshing = true
-        defer { refreshing = false }
+        defer {
+            if currency == requestedCurrency {
+                refreshing = false
+            }
+        }
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
             guard let http = response as? HTTPURLResponse,
@@ -179,7 +195,10 @@ final class CurrencyStore: ObservableObject {
                 )
             }
             persistCache()
-            guard currency == requested, let cached = cache[requested.rawValue] else { return }
+            guard !Task.isCancelled,
+                  currency == requestedCurrency,
+                  let cached = cache[requestedCurrency.rawValue]
+            else { return }
             usdRate = cached.rate
             lastUpdated = cached.fetchedAt
         } catch {

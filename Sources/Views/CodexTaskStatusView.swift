@@ -38,7 +38,9 @@ struct CodexTaskStatusView: View {
                                     .foregroundStyle(Color.primary.opacity(0.58))
                             }
                         } else if let updatedAt = store.snapshot.updatedAt {
-                            Text(L10n.tr("Updated %@", relative(updatedAt)))
+                            TimelineView(.periodic(from: .now, by: 30)) { context in
+                                Text(L10n.tr("Updated %@", relative(updatedAt, to: context.date)))
+                            }
                                 .font(Typography.caption)
                                 .foregroundStyle(Color.primary.opacity(0.52))
                         }
@@ -101,8 +103,8 @@ struct CodexTaskStatusView: View {
         return formatter
     }()
 
-    private func relative(_ date: Date) -> String {
-        Self.relativeFormatter.localizedString(for: date, relativeTo: Date())
+    private func relative(_ date: Date, to now: Date) -> String {
+        Self.relativeFormatter.localizedString(for: date, relativeTo: now)
     }
 
     private func activitySummary(at date: Date, startedAt: Date) -> String {

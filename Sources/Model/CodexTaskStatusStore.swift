@@ -264,7 +264,10 @@ final class CodexTaskStatusStore: ObservableObject {
                 files: result.watchedFiles
             )
             if let snapshot = result.snapshot {
-                self.apply(snapshot)
+                self.apply(
+                    snapshot,
+                    hasNewApproval: result.soundEvents.contains(.approvalRequired)
+                )
             }
             let shouldEmitEffects = self.hasCompletedInitialScan
             self.hasCompletedInitialScan = true
@@ -279,12 +282,12 @@ final class CodexTaskStatusStore: ObservableObject {
         }
     }
 
-    private func apply(_ nextSnapshot: Snapshot) {
+    private func apply(_ nextSnapshot: Snapshot, hasNewApproval: Bool = false) {
         let enteredApproval = nextSnapshot.waitingApprovalTaskCount > 0
             && (snapshot.waitingApprovalTaskCount == 0
                 || snapshot.threadID != nextSnapshot.threadID)
         snapshot = nextSnapshot
-        if enteredApproval {
+        if enteredApproval || hasNewApproval {
             approvalReminderCount = 0
             nextApprovalReminderAt = Date().addingTimeInterval(
                 Self.approvalReminderInterval
@@ -409,12 +412,56 @@ final class CodexTaskStatusStore: ObservableObject {
     private func triggerRaycastConfetti(generation: UInt64) {
         guard monitoringGeneration == generation,
               isRenderable,
-              NSWorkspace.shared.urlForApplication(
-                withBundleIdentifier: "com.raycast-x.macos"
-              ) != nil,
-              let url = URL(string: "raycast-x://confetti")
+              let applicationURL = NSWorkspace.shared.urlForApplication(
+                withBundleIdentifier: "com.raycast.macos"
+              ),
+              let confettiURL = URL(string: "raycast://confetti")
         else { return }
-        NSWorkspace.shared.open(url)
+
+        let workspace = NSWorkspace.shared
+        if !NSRunningApplication.runningApplications(
+            withBundleIdentifier: "com.raycast.macos"
+        ).isEmpty {
+            openRaycastURL(confettiURL, with: applicationURL)
+            return
+        }
+
+        // A deeplink sent while Raycast is cold can be consumed merely to
+        // launch the application. Start it without activation, then deliver
+        // the command after its URL handler has finished registering.
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.activates = false
+        workspace.openApplication(
+            at: applicationURL,
+            configuration: configuration
+        ) { [weak self] _, error in
+            guard error == nil else { return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.75) {
+                guard let self,
+                      self.monitoringGeneration == generation,
+                      self.isRenderable,
+                      self.confettiEnabled
+                else { return }
+                self.openRaycastURL(confettiURL, with: applicationURL)
+            }
+        }
+    }
+
+    private func openRaycastURL(_ url: URL, with applicationURL: URL) {
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.activates = false
+        NSWorkspace.shared.open(
+            [url],
+            withApplicationAt: applicationURL,
+            configuration: configuration
+        ) { _, error in
+            if let error {
+                NSLog(
+                    "CodexIsland: failed to trigger Raycast confetti: %@",
+                    error.localizedDescription
+                )
+            }
+        }
     }
 
     private var isRenderable: Bool {
@@ -670,7 +717,7 @@ final class CodexTaskStatusStore: ObservableObject {
         let selectedFiles = CodexTaskStatusFilePolicy.selectTopLevelFiles(
             from: filesByRecency,
             maximumCount: maximumTrackedFiles,
-            prioritizing: CodexTaskStatusLogParser.waitingApprovalURLs()
+            prioritizing: CodexTaskStatusLogParser.activeURLs()
         )
         return RolloutDiscovery(
             files: selectedFiles,

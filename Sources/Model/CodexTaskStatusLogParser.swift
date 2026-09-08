@@ -142,6 +142,14 @@ struct CodexTaskStatusLogParser {
             })
         }
 
+        func activeURLs() -> Set<URL> {
+            lock.lock()
+            defer { lock.unlock() }
+            return Set(entries.compactMap { url, entry in
+                entry.state == .running || entry.state == .waitingApproval ? url : nil
+            })
+        }
+
         func subagentSession(for url: URL) -> Bool? {
             lock.lock()
             defer { lock.unlock() }
@@ -161,6 +169,10 @@ struct CodexTaskStatusLogParser {
 
     static func waitingApprovalURLs() -> Set<URL> {
         cache.waitingApprovalURLs()
+    }
+
+    static func activeURLs() -> Set<URL> {
+        cache.activeURLs()
     }
 
     static func isSubagentSession(at url: URL, maxBytes: Int = 64 * 1024) -> Bool {
@@ -216,6 +228,9 @@ struct CodexTaskStatusLogParser {
             readStart = canContinue
                 ? cached.offset
                 : (length > maxBytes ? length - maxBytes : 0)
+            // Preserve terminal and approval markers across a capped suffix
+            // read. In particular, task_complete must not turn a preceding
+            // error outside the tail window into a false success sound.
             initialState = cached.state
             initialStartedAt = cached.startedAt
             initialFailure = cached.currentTurnFailed
@@ -254,6 +269,14 @@ struct CodexTaskStatusLogParser {
             currentTurnFailed: initialFailure,
             pendingPermissionCallIDs: initialPendingPermissionCallIDs
         )
+        if !result.recognizedLifecycle, let cached, hasCachedBaseline {
+            return CodexTaskLogParseResult(
+                state: cached.state,
+                startedAt: cached.startedAt,
+                soundEvents: [],
+                isInitialRead: false
+            )
+        }
         if !result.recognizedLifecycle, !hasCachedBaseline {
             return nil
         }

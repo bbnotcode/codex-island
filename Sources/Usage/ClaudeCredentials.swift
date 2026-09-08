@@ -561,6 +561,20 @@ enum ClaudeCredentials {
     @discardableResult
     static func spawnTokenRefreshPing() -> Bool {
         guard let path = locateClaudeBinary() else { return false }
+        let inheritedEnvironment = ProcessInfo.processInfo.environment
+        let alternativeBackendKeys = [
+            "CLAUDE_CODE_USE_BEDROCK",
+            "CLAUDE_CODE_USE_VERTEX",
+            "CLAUDE_CODE_USE_FOUNDRY",
+            "ANTHROPIC_BASE_URL",
+            "ANTHROPIC_BEDROCK_BASE_URL",
+        ]
+        guard !alternativeBackendKeys.contains(where: {
+            !(inheritedEnvironment[$0] ?? "").isEmpty
+        }) else {
+            NSLog("CodexIsland: skipped claude token-refresh ping because an alternate backend is configured")
+            return false
+        }
         let task = Process()
         task.launchPath = path
         task.arguments = ["-p", "ok", "--model", "haiku", "--strict-mcp-config"]
@@ -570,7 +584,7 @@ enum ClaudeCredentials {
         // would route the CLI to API-key billing or to an injected token
         // that bypasses the keychain writeback (app launched from a shell
         // that exports them).
-        var env = ProcessInfo.processInfo.environment
+        var env = inheritedEnvironment
         for key in ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN"] {
             env.removeValue(forKey: key)
         }

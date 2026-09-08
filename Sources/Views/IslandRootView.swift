@@ -43,7 +43,7 @@ struct IslandRootView: View {
                         ))
                         .opacity(contentVisible ? 1 : 0)
                         // Slide down from -8 → 0 on enter pairs with the
-                        // 100ms→180ms opacity delay set in onHover. On
+                        // 100ms→180ms opacity delay set when opening. On
                         // exit the offset never matters because the
                         // content fully fades before the shape shrinks.
                         .offset(y: contentVisible ? 0 : -8)
@@ -158,21 +158,14 @@ struct IslandRootView: View {
                         }
                         return
                     }
-                    // Keep click as an accessibility/fallback path; ordinary
-                    // pointer use expands immediately on hover.
-                    expandPanel()
                 }
                 .onHover { h in
                     hovering = h
                     if h {
-                        // Trackpad tap on hover-in. .levelChange is closer to
-                        // a volume-key tick than the .generic notification
-                        // pattern. No-op if haptics are off.
-                        NSHapticFeedbackManager.defaultPerformer.perform(
-                            .levelChange, performanceTime: .now
-                        )
-                        expandPanel()
-                    } else {
+                        // Re-entering an expanded panel cancels a pending
+                        // hover-exit collapse. Hover alone never expands.
+                        collapseRequest = UUID()
+                    } else if model.state == .expanded {
                         scheduleCollapseAfterHoverExit()
                     }
                 }
@@ -244,13 +237,26 @@ struct IslandRootView: View {
             // crossing tick.
             AlertEngine.shared.pulseEvent = nil
         }
+        .onReceive(NotificationCenter.default.publisher(for: .islandRightClickRequested)) { _ in
+            NSHapticFeedbackManager.defaultPerformer.perform(
+                .levelChange, performanceTime: .now
+            )
+            expandPanel()
+        }
     }
 
     /// Force-extends the island into peek state for ~4s when the alert
     /// engine signals a fresh threshold crossing. Suppressed when the panel
     /// is already expanded — the user is already looking at the data.
     private func handlePulse(_ event: AlertEngine.PulseEvent) {
-        guard model.state != .expanded else { return }
+        if model.state == .expanded {
+            if !contentVisible {
+                withAnimation(.strongEaseOut) {
+                    contentVisible = true
+                }
+            }
+            return
+        }
 
         if model.state == .compact {
             withAnimation(.openMorph) {
@@ -348,9 +354,9 @@ struct IslandRootView: View {
         switch model.state {
         case .compact:
             return alwaysShow.enabled
-                ? L10n.tr("Hover to expand. Move away to collapse.")
-                : L10n.tr("Hover to expand. Move away to collapse.")
-        case .peek:     return L10n.tr("Hover to expand. Move away to collapse.")
+                ? L10n.tr("Right-click to expand. Move away to collapse.")
+                : L10n.tr("Right-click to expand. Move away to collapse.")
+        case .peek:     return L10n.tr("Right-click to expand. Move away to collapse.")
         case .expanded:
             return ScreenPref.shared.screen == .overview
                 ? L10n.tr("Swipe to change pages.")

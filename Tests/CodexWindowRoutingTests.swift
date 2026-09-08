@@ -107,6 +107,19 @@ struct CodexWindowRoutingTests {
             "peek chrome describes the 5h window on two-window plans"
         )
 
+        let weeklyExhausted = AppUsage(
+            fiveHour: WindowUsage(usedPercent: 0.20, resetAt: nil, error: nil),
+            weekly: WindowUsage(usedPercent: 1.00, resetAt: nil, error: nil)
+        )
+        expect(
+            weeklyExhausted.preferredWindow.kind == .weekly,
+            "an exhausted weekly allowance overrides spare 5h capacity"
+        )
+        expect(
+            weeklyExhausted.peekWindow.displayedPercentInt(mode: .remaining) == 0,
+            "peek reports no usable allowance when the weekly limit is exhausted"
+        )
+
         // MARK: shapes without limit_window_seconds fall back to slot order
 
         let legacy = UsageFetcher.routeCodexWindows(parse("""

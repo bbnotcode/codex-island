@@ -63,6 +63,11 @@ struct WindowUsage {
     func displayedPercentInt(mode: UsageDisplayMode) -> Int {
         Int((displayedFraction(mode: mode) * 100).rounded())
     }
+
+    /// A fully consumed window blocks usage even when a shorter sibling
+    /// window still has capacity. Clamp tolerance is intentionally handled
+    /// by the provider-normalized value rather than the rounded UI percent.
+    var isExhausted: Bool { hasReading && usedPercent >= 1 }
 }
 
 struct AppUsage {
@@ -81,6 +86,11 @@ struct AppUsage {
     static let empty = AppUsage(fiveHour: .unknown, weekly: .unknown)
 
     var preferredWindow: (kind: UsageWindow, usage: WindowUsage) {
+        // An exhausted long-term allowance is the effective account limit:
+        // spare capacity in the 5h window cannot be used until the weekly
+        // window resets. Surface the binding constraint in compact chrome
+        // and alerts instead of presenting an unusable short-term balance.
+        if weekly.isExhausted { return (.weekly, weekly) }
         if fiveHour.hasReading { return (.fiveHour, fiveHour) }
         return (.weekly, weekly)
     }

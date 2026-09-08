@@ -105,8 +105,10 @@ enum UsageFetcher {
     }
 
     private static func parseCodexWindow(_ obj: Any?) -> WindowUsage {
-        guard let d = obj as? [String: Any] else { return .unknown }
-        let used = (d["used_percent"] as? Double) ?? 0
+        guard let d = obj as? [String: Any],
+              let used = d["used_percent"] as? Double,
+              used.isFinite
+        else { return .unknown }
         let resetAt = (d["reset_at"] as? Double).map { Date(timeIntervalSince1970: $0) }
         return WindowUsage(usedPercent: used / 100, resetAt: resetAt, error: nil)
     }
@@ -219,13 +221,15 @@ enum UsageFetcher {
     }
 
     private static func parseClaudeWindow(_ obj: Any?) -> WindowUsage {
-        guard let d = obj as? [String: Any] else { return .unknown }
+        guard let d = obj as? [String: Any],
+              let raw = (d["utilization"] as? Double) ?? (d["used_percent"] as? Double),
+              raw.isFinite
+        else { return .unknown }
         // Anthropic returns `utilization` as a percentage in [0, 100], not a
         // normalized [0, 1] fraction. An earlier `raw > 1 ? raw / 100 : raw`
         // heuristic broke the moment the 5h window reset: utilization values
         // in (0, 1] (e.g. 0.5% used → 0.5) were treated as already-normalized
         // and rendered as 50%–100%. Always divide by 100; clamp below.
-        let raw = (d["utilization"] as? Double) ?? (d["used_percent"] as? Double) ?? 0
         let normalized = raw / 100.0
         var resetAt: Date?
         if let r = d["resets_at"] as? Double {
