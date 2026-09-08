@@ -54,7 +54,15 @@ final class UsageHistoryStore: ObservableObject {
     /// Readings for one series, oldest first. The latest entry is the most
     /// recent successful poll.
     func samples(provider: AlertEngine.Provider, window: UsageWindow) -> [UsageSample] {
-        series[key(provider, window)] ?? []
+        samples(key: key(provider, window))
+    }
+
+    func samples(key: String) -> [UsageSample] { series[key] ?? [] }
+
+    func record(key: String, window: WindowUsage, at: Date) {
+        guard append(key, window, at) else { return }
+        persist()
+        revision &+= 1
     }
 
     /// Newest recorded reading for a series, or nil when there is none or the
@@ -77,8 +85,11 @@ final class UsageHistoryStore: ObservableObject {
         _ reading: WindowUsage,
         _ at: Date
     ) -> Bool {
+        append(key(provider, window), reading, at)
+    }
+
+    private func append(_ k: String, _ reading: WindowUsage, _ at: Date) -> Bool {
         guard reading.error == nil else { return false }
-        let k = key(provider, window)
         var arr = series[k] ?? []
         arr.append(UsageSample(at: at, used: max(0, min(1, reading.usedPercent))))
         let cutoff = at.addingTimeInterval(-Self.maxAge)

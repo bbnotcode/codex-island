@@ -111,6 +111,35 @@ swiftc \
 
 swiftc \
   -parse-as-library \
+  -o "$OUT_DIR/provider-connection-tests" \
+  Sources/Model/IslandProvider.swift \
+  Sources/Model/ProviderVisibilityStore.swift \
+  Sources/Model/UsageDisplayModeStore.swift \
+  Sources/Usage/AppUsage.swift \
+  Sources/Model/ProviderQuotaPreferences.swift \
+  Sources/Usage/ConnectedUsage.swift \
+  Sources/Usage/GrokConnection.swift \
+  Sources/Usage/AntigravityConnection.swift \
+  Tests/ProviderConnectionTests.swift
+
+"$OUT_DIR/provider-connection-tests"
+
+
+swiftc \
+  -parse-as-library \
+  -o "$OUT_DIR/antigravity-cli-tests" \
+  Sources/Model/IslandProvider.swift \
+  Sources/Model/UsageDisplayModeStore.swift \
+  Sources/Usage/AppUsage.swift \
+  Sources/Usage/ConnectedUsage.swift \
+  Sources/Usage/GrokConnection.swift \
+  Sources/Usage/AntigravityConnection.swift \
+  Tests/AntigravityCLIConnectionTests.swift
+
+"$OUT_DIR/antigravity-cli-tests"
+
+swiftc \
+  -parse-as-library \
   -o "$OUT_DIR/local-provider-cost-tests" \
   Sources/Cost/TokenEvent.swift \
   Sources/Cost/LocalCostScan.swift \

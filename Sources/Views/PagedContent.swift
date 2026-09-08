@@ -22,15 +22,16 @@ struct PagedContent: View {
     var body: some View {
         GeometryReader { geo in
             let pageWidth = geo.size.width
-            HStack(spacing: 0) {
+            HStack(alignment: .top, spacing: 0) {
                 UsageView()
-                    .offset(y: compactPageYOffset)
-                    .frame(width: pageWidth)
+                    .frame(width: pageWidth, height: geo.size.height, alignment: .top)
+                    .accessibilityHidden(screenPref.screen != .usage)
                 CostView()
-                    .offset(y: compactPageYOffset)
-                    .frame(width: pageWidth)
+                    .frame(width: pageWidth, height: geo.size.height, alignment: .top)
+                    .accessibilityHidden(screenPref.screen != .cost)
                 OverviewView(model: model)
-                    .frame(width: pageWidth)
+                    .frame(width: pageWidth, height: geo.size.height, alignment: .top)
+                    .accessibilityHidden(screenPref.screen != .overview)
             }
             .frame(width: pageWidth, height: geo.size.height, alignment: .topLeading)
             .offset(x: (-pageWidth * CGFloat(screenPref.screen.pageIndex)) + peekOffset + bumpOffset)
@@ -74,8 +75,6 @@ struct PagedContent: View {
             }
         }
     }
-
-    private let compactPageYOffset: CGFloat = -28
 
     private func schedulePeek() {
         // 0.40s lets the panel's openMorph + content fade-in settle
