@@ -102,26 +102,3 @@ provider cancels its pending request, and swapping positions does not fetch.
 Grok's CLI billing response and Antigravity's quota protocol can change.
 Fixture tests cover parsing and selection; validating authentication requires a
 signed-in CLI. Authenticated requests use HTTPS and do not follow redirects.
-
-## Provider colors
-
-Provider identity colors live in `Sources/Theme/Colors.swift` and are routed
-through `IslandProvider.color` for marks, usage charts, cost charts, and peek.
-These are CodexIsland display colors, not claims about official brand palettes.
-
-| Provider | Color | Hex |
-| --- | --- | --- |
-| Claude | Terracotta | `#CC785C` |
-| Codex | Sky blue | `#5AA8F0` |
-| Grok | White | `#FFFFFF` |
-| Antigravity | Lilac | `#B69CFF` |
-
-Antigravity uses a separate hue from Codex so adjacent providers are recognizable
-at a glance. Green, amber, and red remain reserved for status and alerts. Keep
-provider names and distinct marks visible so identification never depends only
-on color.
-
-`CODEXISLAND_DEMO=1` also supplies synthetic Grok and Antigravity cost totals,
-cumulative trends, and overview token history. VALUE uses illustrative monthly
-plan baselines ($30 and $19.99 respectively) only in demo mode. These fixtures
-never write the real cost cache or establish live subscription prices.
