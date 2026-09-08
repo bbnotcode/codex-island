@@ -155,3 +155,16 @@ swiftc \
   Tests/LocalProviderCostTests.swift
 
 "$OUT_DIR/local-provider-cost-tests"
+
+swiftc \
+  -parse-as-library \
+  -o "$OUT_DIR/provider-session-recovery-tests" \
+  Sources/Model/IslandProvider.swift \
+  Sources/Model/UsageDisplayModeStore.swift \
+  Sources/Usage/AppUsage.swift \
+  Sources/Usage/ConnectedUsage.swift \
+  Sources/Usage/GrokConnection.swift \
+  Sources/Usage/ProviderSessionRecovery.swift \
+  Tests/ProviderSessionRecoveryTests.swift
+
+"$OUT_DIR/provider-session-recovery-tests"

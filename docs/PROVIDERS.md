@@ -26,8 +26,10 @@ reads. Settings opens the CLI login when installed, or the official Grok Build
 page when it is missing. After signing in, choose Refresh connection.
 
 The adapter reads `$GROK_HOME/auth.json` (default `~/.grok/auth.json`) and requests
-credit usage from the Grok CLI billing service. It never refreshes or writes the
-CLI's tokens. The default metric is Credits. Missing percentages remain unknown;
+credit usage from the Grok CLI billing service. On expiry or HTTP 401, the app
+runs `grok models` once to let the CLI
+renew its session, then rereads credentials and retries. It never rotates or writes
+the CLI's tokens itself. The default metric is Credits. Missing percentages remain unknown;
 a billing period alone is not interpreted as zero usage.
 
 ## Google Antigravity
@@ -38,8 +40,11 @@ official CLI installation page when missing. After signing in, choose Refresh
 connection.
 
 The adapter reads the CLI's macOS Keychain entry (`gemini` / `antigravity`) without
-writing or refreshing it. An expired access token asks the user to open `agy`,
-which owns its token lifecycle. It resolves the signed-in account's project via
+writing it. On expiry or HTTP 401, the app runs `agy models` once,
+then rereads the Keychain and retries. The CLI owns token refresh and persistence.
+These model-list commands run without a prompt, with closed stdin and a 25-second
+timeout; they do not start an agent turn. Failed renewal is reported as a connection
+error, and HTTP 403 is not treated as proof of logout. It resolves the signed-in account's project via
 `loadCodeAssist`, then passes that project to `retrieveUserQuotaSummary`.
 The account project isolates display preferences and quota history. A Gemini API
 key alone is not treated as an Antigravity subscription login.
