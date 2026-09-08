@@ -27,6 +27,11 @@ struct CostWindow {
     /// doesn't silently read as $0.
     let unknownModels: [String]
 
+    static func unavailable(label: String, reason: String) -> CostWindow {
+        CostWindow(dollars: 0, tokens: 0, billableTokens: 0, series: [], label: label,
+                   error: reason, unknownModels: [])
+    }
+
     static let unknown = CostWindow(
         dollars: 0, tokens: 0, billableTokens: 0, series: [], label: "—",
         error: "no data", unknownModels: []

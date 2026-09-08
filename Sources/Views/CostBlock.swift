@@ -249,6 +249,7 @@ struct CostTile: View {
             switch provider {
             case .claude: return usageStore.claude.plan?.lowercased()
             case .codex:  return usageStore.codex.plan?.lowercased()
+            case .grok, .antigravity: return nil
             }
         }()
         guard let plan else { return nil }
@@ -269,6 +270,7 @@ struct CostTile: View {
             switch provider {
             case .claude: return usageStore.claude.plan?.lowercased()
             case .codex:  return usageStore.codex.plan?.lowercased()
+            case .grok, .antigravity: return nil
             }
         }()
         guard let plan else { return nil }
