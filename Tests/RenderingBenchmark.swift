@@ -64,7 +64,7 @@ private struct BenchmarkPanel: View {
     @ObservedObject var model: IslandModel
     var body: some View {
         ExpandedView(model: model)
-            .frame(width: model.size.width, height: model.size.height)
+            .frame(width: model.size.width)
             .background(.black)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }

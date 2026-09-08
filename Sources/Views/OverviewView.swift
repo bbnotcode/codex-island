@@ -1,12 +1,10 @@
 import SwiftUI
 
 struct OverviewView: View {
-    let model: IslandModel
     @ObservedObject private var costStore = CostStore.shared
 
     var body: some View {
         OverviewContent(
-            model: model,
             allDays: OverviewContent.joinDays(buckets: Dictionary(uniqueKeysWithValues:
                 IslandProvider.allCases.map { ($0, costStore.cost(for: $0).dailyTokens) }
             )),
@@ -19,7 +17,6 @@ struct OverviewView: View {
 /// the cost page, but framed as usage history: cell intensity is token
 /// volume, and cell hue follows the dominant provider for that day.
 private struct OverviewContent: View {
-    let model: IslandModel
     let allDays: [OverviewDay]
     let loading: Bool
     @State private var selectedDate: Date?
@@ -84,15 +81,6 @@ private struct OverviewContent: View {
         .padding(.top, 4)
         .padding(.bottom, 6)
         .animation(.detailExpand, value: selectedDate)
-        .onAppear {
-            model.setOverviewDayDetailVisible(ScreenPref.shared.screen == .overview && selectedDate != nil)
-        }
-        .onDisappear {
-            model.setOverviewDayDetailVisible(false)
-        }
-        .onChange(of: selectedDate) { _ in
-            model.setOverviewDayDetailVisible(ScreenPref.shared.screen == .overview && selectedDate != nil)
-        }
         .onReceive(ScreenPref.shared.$screen.dropFirst()) { screen in
             guard screen != .overview else { return }
             if selectedDate != nil {
@@ -102,7 +90,6 @@ private struct OverviewContent: View {
                     selectedDate = nil
                 }
             }
-            model.setOverviewDayDetailVisible(false)
         }
     }
 
