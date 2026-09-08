@@ -3,7 +3,7 @@ import SwiftUI
 /// Count-up animated dollar number — the slot-machine reveal that gives
 /// the cost screen its dopamine hit. Interpolates from `lastSeenTarget`
 /// (or 0 on first appearance) to `target` over ~0.65s using a cubic
-/// ease-out, driven by a 60Hz TimelineView.
+/// ease-out, paced for the expanded panel and Low Power Mode.
 ///
 /// Visually identical to the previous static text — same 38pt brand-color
 /// monospace digits with the dual-shadow glow whose intensity is locked
@@ -16,19 +16,19 @@ struct CountUpDollar: View {
 
     private static let duration: TimeInterval = 0.65
 
+    @ObservedObject private var lowPower = LowPowerModeStore.shared
+
     @State private var animationStart: Date = Date()
     @State private var startValue: Double = 0
     @State private var lastSeenTarget: Double = 0
-    /// Gates the 60Hz TimelineView. Once the count settles we render a
-    /// plain `Text` so SwiftUI stops re-evaluating this body 60 times per
-    /// second. Four cost cells each running idle TimelineViews adds up.
+    /// Stop scheduling frames once the counter settles.
     @State private var animating: Bool = false
     @State private var animationToken: UUID = UUID()
 
     var body: some View {
         Group {
             if animating {
-                TimelineView(.animation(minimumInterval: 1.0 / 60.0)) { context in
+                TimelineView(.animation(minimumInterval: frameInterval)) { context in
                     let elapsed = context.date.timeIntervalSince(animationStart)
                     digits(formatted(interpolatedValue(elapsed: elapsed)))
                 }
@@ -53,6 +53,13 @@ struct CountUpDollar: View {
             lastSeenTarget = target
             startAnimation()
         }
+    }
+
+    private var frameInterval: TimeInterval {
+        1.0 / Double(ExpandedFrameRate.preferred(
+            maximum: DisplayInfo.currentTarget()?.screen.maximumFramesPerSecond ?? 60,
+            lowPower: lowPower.effectiveEnabled
+        ))
     }
 
     private func displayedValue() -> Double {

@@ -1,20 +1,29 @@
 import SwiftUI
 
+struct OverviewView: View {
+    let model: IslandModel
+    @ObservedObject private var costStore = CostStore.shared
+
+    var body: some View {
+        OverviewContent(
+            model: model,
+            allDays: OverviewContent.joinDays(buckets: Dictionary(uniqueKeysWithValues:
+                IslandProvider.allCases.map { ($0, costStore.cost(for: $0).dailyTokens) }
+            )),
+            loading: costStore.loading
+        )
+    }
+}
+
 /// Minimal contribution-style view. Powered by the same local log scan as
 /// the cost page, but framed as usage history: cell intensity is token
 /// volume, and cell hue follows the dominant provider for that day.
-struct OverviewView: View {
-    @ObservedObject var model: IslandModel
-    @ObservedObject private var screenPref = ScreenPref.shared
-    @ObservedObject private var costStore = CostStore.shared
+private struct OverviewContent: View {
+    let model: IslandModel
+    let allDays: [OverviewDay]
+    let loading: Bool
     @State private var selectedDate: Date?
     @State private var selectedProvider: IslandProvider?
-
-    private var allDays: [OverviewDay] {
-        Self.joinDays(buckets: Dictionary(uniqueKeysWithValues:
-            IslandProvider.allCases.map { ($0, costStore.cost(for: $0).dailyTokens) }
-        ))
-    }
 
     private var days: [OverviewDay] {
         guard let selectedProvider else { return allDays }
@@ -76,15 +85,15 @@ struct OverviewView: View {
         .padding(.bottom, 6)
         .animation(.detailExpand, value: selectedDate)
         .onAppear {
-            model.setOverviewDayDetailVisible(screenPref.screen == .overview && selectedDate != nil)
+            model.setOverviewDayDetailVisible(ScreenPref.shared.screen == .overview && selectedDate != nil)
         }
         .onDisappear {
             model.setOverviewDayDetailVisible(false)
         }
         .onChange(of: selectedDate) { _ in
-            model.setOverviewDayDetailVisible(screenPref.screen == .overview && selectedDate != nil)
+            model.setOverviewDayDetailVisible(ScreenPref.shared.screen == .overview && selectedDate != nil)
         }
-        .onChange(of: screenPref.screen) { screen in
+        .onReceive(ScreenPref.shared.$screen.dropFirst()) { screen in
             guard screen != .overview else { return }
             if selectedDate != nil {
                 var transaction = Transaction()
@@ -119,7 +128,7 @@ struct OverviewView: View {
                 Text(summarySubline)
                     .font(Typography.label)
                     .foregroundStyle(.white.opacity(0.50))
-                if costStore.loading {
+                if loading {
                     Text(L10n.tr("Syncing"))
                         .font(Typography.caption)
                         .foregroundStyle(.white.opacity(0.36))
@@ -157,7 +166,7 @@ struct OverviewView: View {
         }.joined(separator: ", ")
     }
 
-    private static func joinDays(buckets: [IslandProvider: [DailyTokenBucket]]) -> [OverviewDay] {
+    static func joinDays(buckets: [IslandProvider: [DailyTokenBucket]]) -> [OverviewDay] {
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = .current
         let today = cal.startOfDay(for: Date())
@@ -295,7 +304,7 @@ private struct ContributionGrid: View {
         .frame(maxWidth: .infinity, minHeight: gridHeight + 19, maxHeight: gridHeight + 19, alignment: .leading)
         .clipped()
         .accessibilityElement(children: .contain)
-        .accessibilityLabel(L10n.tr("Daily token usage in %@", OverviewView.currentYearString))
+        .accessibilityLabel(L10n.tr("Daily token usage in %@", OverviewContent.currentYearString))
     }
 
     private var weeks: [ContributionWeek] {
@@ -506,12 +515,10 @@ private struct ContributionCell: View {
             provider.color.opacity(opacity)
                 .overlay(alignment: .bottom) {
                     if day.usage.count > 1 {
-                        GeometryReader { geo in
-                            HStack(spacing: 0) {
-                                ForEach(day.usage) { item in
-                                    item.provider.color.opacity(max(0.35, opacity))
-                                        .frame(width: geo.size.width * CGFloat(Double(item.tokens) / Double(day.totalTokens)))
-                                }
+                        HStack(spacing: 0) {
+                            ForEach(day.usage) { item in
+                                item.provider.color.opacity(max(0.35, opacity))
+                                    .frame(width: cellSize * CGFloat(Double(item.tokens) / Double(day.totalTokens)))
                             }
                         }
                         .frame(height: max(2, cellSize * 0.20))
@@ -535,7 +542,7 @@ private struct ContributionCell: View {
         L10n.tr(
             "%@: %@, %@",
             Self.dayFormatter.string(from: day.date),
-            OverviewView.formatTokensSpoken(day.totalTokens),
+            OverviewContent.formatTokensSpoken(day.totalTokens),
             dominanceLabel
         ) + (day.usage.isEmpty ? "" : "\n" + day.usage.map { item in
             let percent = Double(item.tokens) / Double(day.totalTokens) * 100
@@ -662,7 +669,7 @@ private struct DayDetailStrip: View {
                 .foregroundStyle(color.opacity(dimmed ? 0.70 : 0.82))
                 .lineLimit(1)
 
-            Text(OverviewView.formatExactTokens(value))
+            Text(OverviewContent.formatExactTokens(value))
                 .font(Typography.bodyNumber)
                 .foregroundStyle(.white.opacity(0.76))
                 .lineLimit(1)
@@ -670,12 +677,12 @@ private struct DayDetailStrip: View {
                 .allowsTightening(true)
         }
         .frame(width: 82, alignment: .trailing)
-        .help(L10n.tr("%@: %@ tokens", spokenLabel ?? label, OverviewView.formatExactTokens(value)))
+        .help(L10n.tr("%@: %@ tokens", spokenLabel ?? label, OverviewContent.formatExactTokens(value)))
     }
 
     private var accessibilityLabel: String {
-        "\(Self.detailFormatter.string(from: day.date)), all tokens. Total \(OverviewView.formatTokensSpoken(day.totalTokens)), " + day.usage.map {
-            "\($0.provider.name) \(OverviewView.formatTokensSpoken($0.tokens))"
+        "\(Self.detailFormatter.string(from: day.date)), all tokens. Total \(OverviewContent.formatTokensSpoken(day.totalTokens)), " + day.usage.map {
+            "\($0.provider.name) \(OverviewContent.formatTokensSpoken($0.tokens))"
         }.joined(separator: ", ")
     }
 
