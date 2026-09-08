@@ -66,7 +66,7 @@ struct SettingsView: View {
 
             SettingsFooter()
         }
-        .frame(minWidth: 440, minHeight: 420)
+        .frame(minWidth: 440, minHeight: 560)
         .background(Color(red: 0.020, green: 0.020, blue: 0.027))
         .preferredColorScheme(.dark)
     }
