@@ -108,3 +108,21 @@ swiftc \
   Tests/PricingPrecedenceTests.swift
 
 "$OUT_DIR/pricing-precedence-tests"
+
+swiftc \
+  -parse-as-library \
+  -o "$OUT_DIR/local-provider-cost-tests" \
+  Sources/Cost/TokenEvent.swift \
+  Sources/Cost/LocalCostScan.swift \
+  Sources/Cost/ProtobufFields.swift \
+  Sources/Cost/AntigravityLogReader.swift \
+  Sources/Cost/GrokLogReader.swift \
+  Sources/Cost/LogParseCache.swift \
+  Sources/Cost/CostUsage.swift \
+  Sources/Cost/CostBucketing.swift \
+  Sources/Cost/CostSummary.swift \
+  Sources/Cost/PricingCatalog.swift \
+  Sources/Cost/Pricing.swift \
+  Tests/LocalProviderCostTests.swift
+
+"$OUT_DIR/local-provider-cost-tests"
