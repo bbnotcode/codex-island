@@ -43,7 +43,9 @@ providers' own usage endpoints.
   **Cost**, and **Overview**. Cost estimates today and month-to-date spend and
   token throughput from local Claude Code, Codex CLI, and OpenCode session
   data. Overview renders the current year's activity as a contribution-style
-  calendar.
+  calendar using logs from every supported provider, regardless of which
+  providers are selected for the usage pills. Click a provider in the calendar
+  legend to filter its history; click it again to show all providers.
 - **Used or remaining quota.** Display provider windows as usage consumed or
   quota remaining.
 - **Approaching-limit alerts.** Optional warning and critical thresholds tint
