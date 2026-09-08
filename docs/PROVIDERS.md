@@ -26,8 +26,10 @@ reads. Settings opens the CLI login when installed, or the official Grok Build
 page when it is missing. After signing in, choose Refresh connection.
 
 The adapter reads `$GROK_HOME/auth.json` (default `~/.grok/auth.json`) and requests
-credit usage from the Grok CLI billing service. It never refreshes or writes the
-CLI's tokens. The default metric is Credits. Missing percentages remain unknown;
+credit usage from the Grok CLI billing service. On expiry or HTTP 401, the app
+runs `grok models` once to let the CLI
+renew its session, then rereads credentials and retries. It never rotates or writes
+the CLI's tokens itself. The default metric is Credits. Missing percentages remain unknown;
 a billing period alone is not interpreted as zero usage.
 
 ## Google Antigravity
@@ -38,8 +40,11 @@ official CLI installation page when missing. After signing in, choose Refresh
 connection.
 
 The adapter reads the CLI's macOS Keychain entry (`gemini` / `antigravity`) without
-writing or refreshing it. An expired access token asks the user to open `agy`,
-which owns its token lifecycle. It resolves the signed-in account's project via
+writing it. On expiry or HTTP 401, the app runs `agy models` once,
+then rereads the Keychain and retries. The CLI owns token refresh and persistence.
+These model-list commands run without a prompt, with closed stdin and a 25-second
+timeout; they do not start an agent turn. Failed renewal is reported as a connection
+error, and HTTP 403 is not treated as proof of logout. It resolves the signed-in account's project via
 `loadCodeAssist`, then passes that project to `retrieveUserQuotaSummary`.
 The account project isolates display preferences and quota history. A Gemini API
 key alone is not treated as an Antigravity subscription login.
@@ -97,3 +102,26 @@ provider cancels its pending request, and swapping positions does not fetch.
 Grok's CLI billing response and Antigravity's quota protocol can change.
 Fixture tests cover parsing and selection; validating authentication requires a
 signed-in CLI. Authenticated requests use HTTPS and do not follow redirects.
+
+## Provider colors
+
+Provider identity colors live in `Sources/Theme/Colors.swift` and are routed
+through `IslandProvider.color` for marks, usage charts, cost charts, and peek.
+These are CodexIsland display colors, not claims about official brand palettes.
+
+| Provider | Color | Hex |
+| --- | --- | --- |
+| Claude | Terracotta | `#CC785C` |
+| Codex | Sky blue | `#5AA8F0` |
+| Grok | White | `#FFFFFF` |
+| Antigravity | Lilac | `#B69CFF` |
+
+Antigravity uses a separate hue from Codex so adjacent providers are recognizable
+at a glance. Green, amber, and red remain reserved for status and alerts. Keep
+provider names and distinct marks visible so identification never depends only
+on color.
+
+`CODEXISLAND_DEMO=1` also supplies synthetic Grok and Antigravity cost totals,
+cumulative trends, and overview token history. VALUE uses illustrative monthly
+plan baselines ($30 and $19.99 respectively) only in demo mode. These fixtures
+never write the real cost cache or establish live subscription prices.

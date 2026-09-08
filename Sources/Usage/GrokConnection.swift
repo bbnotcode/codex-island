@@ -19,13 +19,14 @@ enum GrokConnection {
             .compactMapValues(\.value)
         let scopes = entries.keys.filter { $0.hasPrefix("https://auth.x.ai::") }.sorted()
         let candidates = scopes + entries.keys.filter { $0 == "https://accounts.x.ai/sign-in" }.sorted()
-        guard let scope = candidates.first, let entry = entries[scope],
-              !entry.key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            throw ProviderConnectionError.signIn
+        let credentials = candidates.compactMap { entries[$0] }.filter {
+            !$0.key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         }
-        if let expires = ProviderPayload.date(entry.expires_at), expires <= now {
-            throw ProviderConnectionError.expired
-        }
+        guard !credentials.isEmpty else { throw ProviderConnectionError.signIn }
+        guard let entry = credentials.first(where: {
+            guard let expiry = ProviderPayload.date($0.expires_at) else { return true }
+            return expiry > now
+        }) else { throw ProviderConnectionError.expired }
         return entry
     }
 
