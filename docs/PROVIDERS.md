@@ -30,6 +30,14 @@ credit usage from the Grok CLI billing service. It never refreshes or writes the
 CLI's tokens. The default metric is Credits. Missing percentages remain unknown;
 a billing period alone is not interpreted as zero usage.
 
+When a connected provider reports no readings, its column shows an actionable
+empty state instead of an empty chart and reset timer. A successfully fetched
+Free plan shows “No active subscription”; paid or unknown plans show “Usage
+unavailable.” Both link to provider settings. Actual readings, including 0%,
+remain visible regardless of the plan label. The Cost page reuses the same
+subscription state when both cost windows are unavailable and contain no usage;
+existing cost records remain visible.
+
 ## Google Antigravity
 
 Sign in with the official `agy` CLI. The desktop app is not required and does
