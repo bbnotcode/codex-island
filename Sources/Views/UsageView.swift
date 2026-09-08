@@ -79,17 +79,24 @@ struct ChartsBlock: View {
                 ReauthState(color: color, usage: usage)
                     .transition(.chartSwap.animation(.chartSwap))
             } else {
-                UsageChartsRow(color: color, style: style, seed: seed,
-                    metrics: [UsageWindow.fiveHour, .weekly].map { kind in
-                        UsageChartMetric(id: kind.rawValue, label: kind == .fiveHour ? "5h" : "week",
-                            window: kind == .fiveHour ? usage.fiveHour : usage.weekly,
-                            historyKey: "\(provider.rawValue).\(kind.rawValue)")
-                    })
+                Group {
+                    if usage.visibleWindows.isEmpty {
+                        ProviderDataUnavailable(message: "Usage limits are not available yet.")
+                    } else {
+                        UsageChartsRow(color: color, style: style, seed: seed,
+                            metrics: usage.visibleWindows.map { kind in
+                                UsageChartMetric(id: kind.rawValue, label: kind == .fiveHour ? "5h" : "week",
+                                                 window: usage.window(kind),
+                                                 historyKey: "\(provider.rawValue).\(kind.rawValue)")
+                            })
+                    }
+                }
                 .transition(.chartSwap.animation(.chartSwap))
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .padding(.horizontal, IslandPanelLayout.columnInset)
+        .animation(.chartSwap, value: usage.visibleWindows)
     }
 }
 
@@ -178,9 +185,12 @@ struct UsageChartsRow: View {
         HStack(spacing: 18) {
             ForEach(Array(metrics.enumerated()), id: \.element.id) { index, metric in
                 ChartTile(style: style, color: color, labelKey: metric.label,
-                          window: metric.window, seed: seed + index, historyKey: metric.historyKey)
+                          window: metric.window, seed: seed + index, historyKey: metric.historyKey,
+                          centered: metrics.count == 1)
             }
         }
+        .frame(maxWidth: metrics.count == 1 ? (style == .numeric ? 180 : 240) : .infinity)
+        .frame(maxWidth: .infinity, alignment: .center)
     }
 }
 
@@ -191,6 +201,7 @@ struct ChartTile: View {
     let window: WindowUsage
     let seed: Int
     let historyKey: String
+    var centered = false
     @ObservedObject private var usageDisplay = UsageDisplayModeStore.shared
     @ObservedObject private var historyStore = UsageHistoryStore.shared
 
@@ -213,7 +224,7 @@ struct ChartTile: View {
         Group {
             if let value {
                 switch style {
-                case .ring:    RingChart(value: value, color: color, label: label, sub: sub)
+                case .ring:    RingChart(value: value, color: color, label: label, sub: sub, centered: centered)
                 case .bar:     BarChart(value: value, color: color, label: label, sub: sub)
                 case .stepped: SteppedChart(value: value, color: color, label: label, sub: sub)
                 case .numeric: NumericChart(value: value, color: color, label: label, sub: compactSubCaption())
@@ -229,7 +240,7 @@ struct ChartTile: View {
         // The blur masks the geometric mismatch between Ring and Bar so the
         // crossfade reads as one morph instead of two stacked objects.
         .transition(.chartSwap.animation(.chartSwap))
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: centered ? .top : .topLeading)
         .frame(height: Self.tileHeight)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(
