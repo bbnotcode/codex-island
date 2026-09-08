@@ -9,6 +9,15 @@ All providers use the same Ring, Bar, Stepped, Numeric, and Sparkline views,
 used/remaining preference, peek pills, and threshold alerts. A provider's data
 selects the metrics; changing providers does not change the chart style.
 
+## Codex limit windows
+
+Codex charts follow the windows reported by the usage API, not the plan name.
+A weekly-only response displays one compact chart centered in the provider column.
+Two reported windows retain the 5h/week pair. The discovered window list survives
+failed refreshes, so an offline request cannot bring back a removed 5h tile.
+Zero-percent windows remain visible. Peek and alerts select the same available
+window, and chart styles and history keys remain unchanged.
+
 ## Grok subscriptions
 
 Sign in with the official Grok CLI (`grok login`) using your Grok subscription.

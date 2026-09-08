@@ -265,6 +265,7 @@ final class UsageStore: ObservableObject {
                                fillUnreported: Bool) -> AppUsage {
         func fill(_ kind: UsageWindow, _ existing: WindowUsage,
                   _ priorWindow: WindowUsage?) -> WindowUsage {
+            if let reported = current.reportedWindows, !reported.contains(kind) { return .unknown }
             guard !existing.hasReading else { return existing }
             if !fillUnreported {
                 if existing.isUnreported { return existing }
@@ -280,7 +281,8 @@ final class UsageStore: ObservableObject {
         return AppUsage(
             fiveHour: fill(.fiveHour, current.fiveHour, prior?.fiveHour),
             weekly: fill(.weekly, current.weekly, prior?.weekly),
-            plan: current.plan
+            plan: current.plan,
+            reportedWindows: current.reportedWindows
         )
     }
 
