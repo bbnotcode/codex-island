@@ -20,6 +20,7 @@ final class UsageStore: ObservableObject {
     /// gates on this.
     @Published var claudeReauthInProgress = false
 
+    private var refreshRequestedAfterSelection = false
     private var refreshTask: Task<Void, Never>?
     private var reauthPollTask: Task<Void, Never>?
     private var pollTimer: Timer?
@@ -59,7 +60,13 @@ final class UsageStore: ObservableObject {
     private static let rateLimitCooldown: TimeInterval = 900
     private var claudeCooldownUntil: Date?
 
+    func refreshForSelectionChange() {
+        if loading { refreshRequestedAfterSelection = true }
+        else { refresh() }
+    }
+
     func refresh() {
+        ProviderConnectionStore.shared.refreshSelected()
         if loading { return }
         // Demo mode for screen recordings: skip the network entirely and
         // inject hand-tuned values that read as "real, healthy heavy-user
@@ -120,11 +127,19 @@ final class UsageStore: ObservableObject {
         loading = true
         refreshTask?.cancel()
         refreshTask = Task {
-            async let codexResult = UsageFetcher.fetchCodex()
-            async let codexResetCreditsResult = UsageFetcher.fetchCodexResetCredits()
+            defer {
+                self.loading = false
+                if self.refreshRequestedAfterSelection {
+                    self.refreshRequestedAfterSelection = false
+                    self.refresh()
+                }
+            }
+            let selection = ProviderVisibilityStore.shared.selected
+            async let codexResult: AppUsage? = selection.contains(.codex) ? UsageFetcher.fetchCodex() : nil
+            async let codexResetCreditsResult = selection.contains(.codex) ? UsageFetcher.fetchCodexResetCredits() : nil
             let coolingDown = claudeCooldownUntil.map { Date() < $0 } ?? false
             var cl: AppUsage?
-            if !coolingDown {
+            if !coolingDown && selection.contains(.claude) {
                 cl = await UsageFetcher.fetchClaude()
             }
             let c = await codexResult
@@ -153,10 +168,12 @@ final class UsageStore: ObservableObject {
             // the tiles for the whole 15-min cooldown. History still has the
             // pre-sleep readings — show them under the failure caption, the
             // same stale-but-true contract as the launch seed.
-            let priorCodex = self.codex
-            self.codex = UsageStore.seeded(
-                AppUsage.merged(fetched: c, retaining: priorCodex, at: now),
-                prior: priorCodex, provider: .codex, fillUnreported: false)
+            if let c {
+                let priorCodex = self.codex
+                self.codex = UsageStore.seeded(
+                    AppUsage.merged(fetched: c, retaining: priorCodex, at: now),
+                    prior: priorCodex, provider: .codex, fillUnreported: false)
+            }
             if let cl {
                 if UsageStore.isRateLimited(cl) {
                     self.claudeCooldownUntil = Date().addingTimeInterval(UsageStore.rateLimitCooldown)
@@ -214,7 +231,7 @@ final class UsageStore: ObservableObject {
             // Record this poll's readings so the SparkChart can plot real
             // history. `record` keeps only non-errored windows, so a failed
             // or rate-limited fetch leaves a gap instead of a flat fake line.
-            UsageHistoryStore.shared.record(provider: .codex, usage: c, at: now)
+            if let c { UsageHistoryStore.shared.record(provider: .codex, usage: c, at: now) }
             if let cl { UsageHistoryStore.shared.record(provider: .claude, usage: cl, at: now) }
             self.lastUpdated = now
             self.loading = false

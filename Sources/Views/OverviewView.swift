@@ -12,8 +12,9 @@ struct OverviewView: View {
 
     private var days: [OverviewDay] {
         Self.joinDays(
-            claudeBuckets: visibility.claudeVisible ? costStore.claude.dailyTokens : [],
-            codexBuckets: visibility.codexVisible ? costStore.codex.dailyTokens : [],
+            leftBuckets: costStore.cost(for: visibility.left).dailyTokens,
+            rightBuckets: visibility.right.map { costStore.cost(for: $0).dailyTokens } ?? [],
+            leftProvider: visibility.left, rightProvider: visibility.right,
             mode: .all
         )
     }
@@ -26,12 +27,12 @@ struct OverviewView: View {
         days.filter { $0.totalTokens > 0 }.count
     }
 
-    private var claudeTokens: Int {
-        days.reduce(0) { $0 + $1.claudeTokens }
+    private var leftTokens: Int {
+        days.reduce(0) { $0 + $1.leftTokens }
     }
 
-    private var codexTokens: Int {
-        days.reduce(0) { $0 + $1.codexTokens }
+    private var rightTokens: Int {
+        days.reduce(0) { $0 + $1.rightTokens }
     }
 
     private var selectedDay: OverviewDay? {
@@ -45,15 +46,19 @@ struct OverviewView: View {
         selectedDay?.totalTokens ?? totalTokens
     }
 
-    private var displayedClaudeTokens: Int {
-        selectedDay?.claudeTokens ?? claudeTokens
+    private var displayedLeftTokens: Int {
+        selectedDay?.leftTokens ?? leftTokens
     }
 
-    private var displayedCodexTokens: Int {
-        selectedDay?.codexTokens ?? codexTokens
+    private var displayedRightTokens: Int {
+        selectedDay?.rightTokens ?? rightTokens
     }
 
     var body: some View {
+        overviewContent
+    }
+
+    private var overviewContent: some View {
         VStack(alignment: .leading, spacing: 12) {
             summary
 
@@ -63,8 +68,8 @@ struct OverviewView: View {
             if let selectedDay {
                 DayDetailStrip(
                     day: selectedDay,
-                    claudeVisible: visibility.claudeVisible,
-                    codexVisible: visibility.codexVisible
+                    leftVisible: true,
+                    rightVisible: visibility.right != nil
                 )
                 .transition(.detailReveal)
             }
@@ -129,10 +134,11 @@ struct OverviewView: View {
             .padding(.bottom, 5)
 
             ProviderSplitRow(
-                claudeTokens: displayedClaudeTokens,
-                codexTokens: displayedCodexTokens,
-                claudeVisible: visibility.claudeVisible,
-                codexVisible: visibility.codexVisible
+                leftProvider: visibility.left, rightProvider: visibility.right,
+                leftTokens: displayedLeftTokens,
+                rightTokens: displayedRightTokens,
+                leftVisible: true,
+                rightVisible: visibility.right != nil
             )
             .padding(.bottom, 5)
 
@@ -152,35 +158,23 @@ struct OverviewView: View {
         guard let selectedDay else { return L10n.tr("%d Active Days", activeDays) }
         switch selectedDay.dominantProvider {
         case .none:   return L10n.tr("No Activity")
-        case .claude: return L10n.tr("Mostly Claude")
-        case .codex:  return L10n.tr("Mostly Codex")
+        case .left: return "Mostly " + selectedDay.leftProvider.name
+        case .right:  return "Mostly " + (selectedDay.rightProvider?.name ?? "")
         case .mixed:  return L10n.tr("Mixed Use")
         }
     }
 
     private var summaryAccessibilityLabel: String {
-        if let selectedDay {
-            return L10n.tr(
-                "%@: %@. Claude %@, Codex %@.",
-                Self.dayLabelFormatter.string(from: selectedDay.date),
-                Self.formatTokensSpoken(displayedTokens),
-                Self.formatTokensSpoken(displayedClaudeTokens),
-                Self.formatTokensSpoken(displayedCodexTokens)
-            )
-        }
-        return L10n.tr(
-            "%@ in %@. %d active days. Claude %@, Codex %@.",
-            Self.formatTokensSpoken(totalTokens),
-            Self.currentYearString,
-            activeDays,
-            Self.formatTokensSpoken(claudeTokens),
-            Self.formatTokensSpoken(codexTokens)
-        )
+        let period = selectedDay.map { Self.dayLabelFormatter.string(from: $0.date) } ?? Self.currentYearString
+        var text = "\(period): \(Self.formatTokensSpoken(displayedTokens)). \(visibility.left.name) \(Self.formatTokensSpoken(displayedLeftTokens))"
+        if let right = visibility.right { text += ", \(right.name) \(Self.formatTokensSpoken(displayedRightTokens))" }
+        return text
     }
 
     private static func joinDays(
-        claudeBuckets: [DailyTokenBucket],
-        codexBuckets: [DailyTokenBucket],
+        leftBuckets: [DailyTokenBucket],
+        rightBuckets: [DailyTokenBucket],
+        leftProvider: IslandProvider, rightProvider: IslandProvider?,
         mode: TokenCountMode
     ) -> [OverviewDay] {
         var cal = Calendar(identifier: .gregorian)
@@ -191,16 +185,17 @@ struct OverviewView: View {
         let end = cal.date(byAdding: .day, value: -1, to: nextYear) ?? today
         let dayCount = (cal.dateComponents([.day], from: start, to: end).day ?? 0) + 1
 
-        let claudeMap = bucketMap(claudeBuckets, mode: mode, calendar: cal)
-        let codexMap = bucketMap(codexBuckets, mode: mode, calendar: cal)
+        let leftMap = bucketMap(leftBuckets, mode: mode, calendar: cal)
+        let rightMap = bucketMap(rightBuckets, mode: mode, calendar: cal)
 
         return (0..<dayCount).map { offset in
             let day = cal.date(byAdding: .day, value: offset, to: start) ?? start
             let key = cal.startOfDay(for: day)
             return OverviewDay(
+                leftProvider: leftProvider, rightProvider: rightProvider,
                 date: key,
-                claudeTokens: claudeMap[key] ?? 0,
-                codexTokens: codexMap[key] ?? 0,
+                leftTokens: leftMap[key] ?? 0,
+                rightTokens: rightMap[key] ?? 0,
                 isFuture: key > today
             )
         }
@@ -264,28 +259,30 @@ struct OverviewView: View {
 }
 
 private struct OverviewDay: Identifiable {
+    let leftProvider: IslandProvider
+    let rightProvider: IslandProvider?
     let date: Date
-    let claudeTokens: Int
-    let codexTokens: Int
+    let leftTokens: Int
+    let rightTokens: Int
     var isFuture = false
 
     var id: Date { date }
-    var totalTokens: Int { claudeTokens + codexTokens }
+    var totalTokens: Int { leftTokens + rightTokens }
 
     var dominantProvider: DominantProvider {
         guard totalTokens > 0 else { return .none }
-        let claudeShare = Double(claudeTokens) / Double(totalTokens)
-        let codexShare = Double(codexTokens) / Double(totalTokens)
-        if claudeShare >= 0.60 { return .claude }
-        if codexShare >= 0.60 { return .codex }
+        let leftShare = Double(leftTokens) / Double(totalTokens)
+        let rightShare = Double(rightTokens) / Double(totalTokens)
+        if leftShare >= 0.60 { return .left }
+        if rightShare >= 0.60 { return .right }
         return .mixed
     }
 }
 
 private enum DominantProvider {
     case none
-    case claude
-    case codex
+    case left
+    case right
     case mixed
 }
 
@@ -363,8 +360,8 @@ private struct ContributionGrid: View {
                 }
                 if date < first || date > today {
                     slots.append(.spacer)
-                } else {
-                    slots.append(.day(map[date] ?? OverviewDay(date: date, claudeTokens: 0, codexTokens: 0)))
+                } else if let day = map[date] {
+                    slots.append(.day(day))
                 }
             }
             out.append(ContributionWeek(id: weekStartDate, slots: slots))
@@ -546,15 +543,15 @@ private struct ContributionCell: View {
         switch day.dominantProvider {
         case .none:
             Color.white.opacity(opacity)
-        case .claude:
-            IslandColor.claude.opacity(opacity)
-        case .codex:
-            IslandColor.codex.opacity(opacity)
+        case .left:
+            day.leftProvider.color.opacity(opacity)
+        case .right:
+            (day.rightProvider?.color ?? .clear).opacity(opacity)
         case .mixed:
             ZStack {
-                IslandColor.codex.opacity(opacity)
-                IslandColor.claude.opacity(opacity)
-                    .clipShape(DiagonalProviderSplitShape(share: claudeShare))
+                (day.rightProvider?.color ?? .clear).opacity(opacity)
+                day.leftProvider.color.opacity(opacity)
+                    .clipShape(DiagonalProviderSplitShape(share: leftShare))
             }
         }
     }
@@ -563,9 +560,9 @@ private struct ContributionCell: View {
         min(3, cellSize * 0.22)
     }
 
-    private var claudeShare: CGFloat {
+    private var leftShare: CGFloat {
         guard day.totalTokens > 0 else { return 0.5 }
-        return CGFloat(Double(day.claudeTokens) / Double(day.totalTokens))
+        return CGFloat(Double(day.leftTokens) / Double(day.totalTokens))
     }
 
     private var strokeColor: Color {
@@ -587,8 +584,8 @@ private struct ContributionCell: View {
     private var dominanceLabel: String {
         switch day.dominantProvider {
         case .none:   return L10n.tr("No Activity")
-        case .claude: return L10n.tr("Mostly Claude")
-        case .codex:  return L10n.tr("Mostly Codex")
+        case .left: return "Mostly " + day.leftProvider.name
+        case .right:  return "Mostly " + (day.rightProvider?.name ?? "")
         case .mixed:  return L10n.tr("Mixed Use")
         }
     }
@@ -679,8 +676,8 @@ private struct TokenIntensityScale {
 
 private struct DayDetailStrip: View {
     let day: OverviewDay
-    let claudeVisible: Bool
-    let codexVisible: Bool
+    let leftVisible: Bool
+    let rightVisible: Bool
 
     var body: some View {
         VStack(spacing: 8) {
@@ -704,8 +701,9 @@ private struct DayDetailStrip: View {
                 .frame(width: 116, alignment: .leading)
 
                 TokenSplitMeter(
-                    claudeTokens: claudeVisible ? day.claudeTokens : 0,
-                    codexTokens: codexVisible ? day.codexTokens : 0
+                    leftProvider: day.leftProvider, rightProvider: day.rightProvider,
+                    leftTokens: leftVisible ? day.leftTokens : 0,
+                    rightTokens: rightVisible ? day.rightTokens : 0
                 )
                 .frame(width: 150)
 
@@ -719,12 +717,12 @@ private struct DayDetailStrip: View {
                     dimmed: true
                 )
 
-                if claudeVisible {
-                    detailMetric(label: "CLAUDE", spokenLabel: "Claude", value: day.claudeTokens, color: IslandColor.claude)
+                if leftVisible {
+                    detailMetric(label: day.leftProvider.name.uppercased(), spokenLabel: day.leftProvider.name, value: day.leftTokens, color: day.leftProvider.color)
                 }
 
-                if codexVisible {
-                    detailMetric(label: "CODEX", spokenLabel: "Codex", value: day.codexTokens, color: IslandColor.codex)
+                if rightVisible {
+                    detailMetric(label: day.rightProvider?.name.uppercased() ?? "", spokenLabel: day.rightProvider?.name, value: day.rightTokens, color: (day.rightProvider?.color ?? .clear))
                 }
             }
         }
@@ -759,13 +757,9 @@ private struct DayDetailStrip: View {
     }
 
     private var accessibilityLabel: String {
-        L10n.tr(
-            "%@, all tokens. Total %@, Claude %@, Codex %@.",
-            Self.detailFormatter.string(from: day.date),
-            OverviewView.formatTokensSpoken(day.totalTokens),
-            OverviewView.formatTokensSpoken(day.claudeTokens),
-            OverviewView.formatTokensSpoken(day.codexTokens)
-        )
+        var text = "\(Self.detailFormatter.string(from: day.date)), all tokens. Total \(OverviewView.formatTokensSpoken(day.totalTokens)), \(day.leftProvider.name) \(OverviewView.formatTokensSpoken(day.leftTokens))"
+        if let right = day.rightProvider { text += ", \(right.name) \(OverviewView.formatTokensSpoken(day.rightTokens))" }
+        return text
     }
 
     private static let detailFormatter: DateFormatter = {
@@ -778,10 +772,12 @@ private struct DayDetailStrip: View {
 }
 
 private struct TokenSplitMeter: View {
-    let claudeTokens: Int
-    let codexTokens: Int
+    let leftProvider: IslandProvider
+    let rightProvider: IslandProvider?
+    let leftTokens: Int
+    let rightTokens: Int
 
-    private var total: Int { claudeTokens + codexTokens }
+    private var total: Int { leftTokens + rightTokens }
 
     var body: some View {
         GeometryReader { geo in
@@ -791,16 +787,16 @@ private struct TokenSplitMeter: View {
 
                 if total > 0 {
                     HStack(spacing: 0) {
-                        if claudeTokens > 0 {
+                        if leftTokens > 0 {
                             Rectangle()
-                                .fill(IslandColor.claude.opacity(0.78))
-                                .frame(width: segmentWidth(claudeTokens, in: geo.size.width))
+                                .fill(leftProvider.color.opacity(0.78))
+                                .frame(width: segmentWidth(leftTokens, in: geo.size.width))
                         }
 
-                        if codexTokens > 0 {
+                        if rightTokens > 0 {
                             Rectangle()
-                                .fill(IslandColor.codex.opacity(0.78))
-                                .frame(width: segmentWidth(codexTokens, in: geo.size.width))
+                                .fill((rightProvider?.color ?? .clear).opacity(0.78))
+                                .frame(width: segmentWidth(rightTokens, in: geo.size.width))
                         }
                     }
                     .clipShape(Capsule())
@@ -817,15 +813,17 @@ private struct TokenSplitMeter: View {
 }
 
 private struct ProviderSplitRow: View {
-    let claudeTokens: Int
-    let codexTokens: Int
-    let claudeVisible: Bool
-    let codexVisible: Bool
+    let leftProvider: IslandProvider
+    let rightProvider: IslandProvider?
+    let leftTokens: Int
+    let rightTokens: Int
+    let leftVisible: Bool
+    let rightVisible: Bool
 
-    private var total: Int { claudeTokens + codexTokens }
+    private var total: Int { leftTokens + rightTokens }
 
     private var visibleCount: Int {
-        (claudeVisible ? 1 : 0) + (codexVisible ? 1 : 0)
+        (leftVisible ? 1 : 0) + (rightVisible ? 1 : 0)
     }
 
     var body: some View {
@@ -835,18 +833,18 @@ private struct ProviderSplitRow: View {
                 .foregroundStyle(.white.opacity(0.36))
         } else {
             HStack(spacing: 8) {
-                if claudeVisible {
+                if leftVisible {
                     splitChip(
-                        color: IslandColor.claude,
-                        label: "Claude",
-                        value: claudeTokens
+                        color: leftProvider.color,
+                        label: leftProvider.name,
+                        value: leftTokens
                     )
                 }
-                if codexVisible {
+                if rightVisible {
                     splitChip(
-                        color: IslandColor.codex,
-                        label: "Codex",
-                        value: codexTokens
+                        color: (rightProvider?.color ?? .clear),
+                        label: rightProvider?.name ?? "",
+                        value: rightTokens
                     )
                 }
             }

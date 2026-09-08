@@ -20,8 +20,35 @@ final class CostStore: ObservableObject {
     @Published var claudeLoading = false
     @Published var codexLoading = false
     @Published var lastUpdated: Date?
+    @Published private(set) var connectedCosts: [IslandProvider: ProviderCost] = [:]
+    @Published private(set) var connectedLoading: Set<IslandProvider> = []
+    @Published private(set) var connectedUpdated: [IslandProvider: Date] = [:]
+    @Published private(set) var localNotices: [IslandProvider: String] = [:]
 
-    var loading: Bool { claudeLoading || codexLoading }
+    func cost(for provider: IslandProvider) -> ProviderCost {
+        switch provider {
+        case .claude: return claude
+        case .codex: return codex
+        case .grok, .antigravity:
+            return connectedCosts[provider] ?? ProviderCost(
+                today: .unavailable(label: "Today", reason: "Local usage has not been loaded"),
+                month: .unavailable(label: CostBucketing.currentMonthLabel(), reason: "Local usage has not been loaded"))
+        }
+    }
+
+    func isLoading(_ provider: IslandProvider) -> Bool {
+        switch provider {
+        case .claude: return claudeLoading
+        case .codex: return codexLoading
+        case .grok, .antigravity: return connectedLoading.contains(provider)
+        }
+    }
+
+    func updatedAt(_ provider: IslandProvider) -> Date? {
+        provider.usesLegacyUsage ? lastUpdated : connectedUpdated[provider]
+    }
+
+    var loading: Bool { claudeLoading || codexLoading || !connectedLoading.isEmpty }
 
     private static let cacheKey = "MacIsland.costCache.v7"
     private static let cacheEncoder = JSONEncoder()
@@ -50,6 +77,16 @@ final class CostStore: ObservableObject {
             return
         }
         let days = CostSummary.yearHistoryDays()
+        for provider in [IslandProvider.antigravity, .grok] where !connectedLoading.contains(provider) {
+            connectedLoading.insert(provider)
+            Task.detached(priority: .utility) { [weak self] in
+                let scan = provider == .antigravity
+                    ? AntigravityLogReader.scan(lookbackDays: days)
+                    : GrokLogReader.scan(lookbackDays: days)
+                let cost = CostSummary.summarize(events: scan.events)
+                await self?.commitLocal(cost, scan: scan, provider: provider)
+            }
+        }
         // Only scan OpenCode when at least one provider will consume
         // the result; avoids wasted I/O when both are already loading.
         let openCodeTask: Task<[TokenEvent], Never>?
@@ -82,6 +119,19 @@ final class CostStore: ObservableObject {
                 await self?.commitCodex(cost)
             }
         }
+    }
+
+    private func commitLocal(_ cost: ProviderCost, scan: LocalCostScan, provider: IslandProvider) {
+        connectedLoading.remove(provider)
+        localNotices[provider] = scan.notice
+        if scan.unreadableFiles > 0 && scan.events.isEmpty { return }
+        var displayed = cost
+        if scan.events.isEmpty {
+            displayed.today = .unavailable(label: displayed.today.label, reason: scan.notice ?? "No local usage records yet")
+            displayed.month = .unavailable(label: displayed.month.label, reason: scan.notice ?? "No local usage records yet")
+        }
+        connectedCosts[provider] = displayed
+        connectedUpdated[provider] = Date()
     }
 
     private func commitClaude(_ cost: ProviderCost) {
@@ -288,5 +338,16 @@ final class CostStore: ObservableObject {
             dailyTokens: snap.codexDailyTokens
         )
         self.lastUpdated = snap.lastUpdated
+    }
+}
+
+extension IslandProvider {
+    var costProvider: TokenEvent.Provider {
+        switch self {
+        case .claude: return .claude
+        case .codex: return .codex
+        case .grok: return .grok
+        case .antigravity: return .antigravity
+        }
     }
 }
