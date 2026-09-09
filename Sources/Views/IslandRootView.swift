@@ -78,36 +78,37 @@ struct IslandRootView: View {
                     }
                 }
                 .overlay(alignment: .topLeading) {
-                    if model.state != .expanded, !usesCodexStatusCompanion {
-                        ProviderMark(provider: visibility.left)
+                    if model.state != .expanded, let left = visibility.leftSlot {
+                        ProviderMark(provider: left)
                             .padding(.leading, logoEdgePadding)
                             .padding(.top, max(0, (model.notch.height - 20) / 2))
                     }
                 }
-                .overlay(alignment: .topLeading) {
+                .overlay(alignment: statusOverlayAlignment) {
                     if model.state != .expanded {
                         CompactCodexTaskStatusOverlay(
                             edgePadding: logoEdgePadding,
                             topPadding: max(0, (model.notch.height - 20) / 2),
-                            showsDetails: model.state == .peek
+                            showsDetails: model.state == .peek,
+                            isLeft: visibility.leftSlot == nil
                         )
                     }
                 }
                 .overlay(alignment: .topTrailing) {
-                    if model.state != .expanded, let right = compactRightProvider {
+                    if model.state != .expanded, let right = visibility.rightSlot {
                         ProviderMark(provider: right)
                             .padding(.trailing, logoEdgePadding)
                             .padding(.top, max(0, (model.notch.height - 20) / 2))
                     }
                 }
                 .overlay(alignment: .topLeading) {
-                    if model.state != .compact, !usesCodexStatusCompanion {
-                        PeekPillOverlay(provider: visibility.left, isLeft: true,
+                    if model.state != .compact, let left = visibility.leftSlot {
+                        PeekPillOverlay(provider: left, isLeft: true,
                             topPadding: max(0, (model.notch.height - 14) / 2), pillsVisible: pillsVisible)
                     }
                 }
                 .overlay(alignment: .topTrailing) {
-                    if model.state != .compact, let right = compactRightProvider {
+                    if model.state != .compact, let right = visibility.rightSlot {
                         PeekPillOverlay(provider: right, isLeft: false,
                             topPadding: max(0, (model.notch.height - 14) / 2), pillsVisible: pillsVisible)
                     }
@@ -310,15 +311,8 @@ struct IslandRootView: View {
         }
     }
 
-    /// A single Codex provider still uses two visual roles: task execution
-    /// on the left and Codex quota on the right. Treating Codex as the left
-    /// provider as well made both compact overlays occupy the same pixels.
-    private var usesCodexStatusCompanion: Bool {
-        taskStatus.enabled && visibility.selected == [.codex]
-    }
-
-    private var compactRightProvider: IslandProvider? {
-        usesCodexStatusCompanion ? .codex : visibility.right
+    private var statusOverlayAlignment: Alignment {
+        visibility.leftSlot == nil ? .topLeading : .topTrailing
     }
 
     private var accessibilityHintForState: String {
@@ -357,6 +351,7 @@ private struct CompactCodexTaskStatusOverlay: View {
     let edgePadding: CGFloat
     let topPadding: CGFloat
     let showsDetails: Bool
+    let isLeft: Bool
 
     @ObservedObject private var visibility = ProviderVisibilityStore.shared
     @ObservedObject private var store = CodexTaskStatusStore.shared
@@ -412,9 +407,9 @@ private struct CompactCodexTaskStatusOverlay: View {
                         }
                     }
                     .frame(width: 156)
-                    .padding(.leading, edgePadding)
+                    .padding(isLeft ? .leading : .trailing, edgePadding)
                     .padding(.top, max(0, topPadding - 1))
-                    .offset(x: -121)
+                    .offset(x: isLeft ? -121 : 121)
                 } else {
                     CodexTaskStatusGlyph(
                         status: store.snapshot.status,
@@ -422,7 +417,7 @@ private struct CompactCodexTaskStatusOverlay: View {
                         showsBackground: false
                     )
                     .shadow(color: statusColor.opacity(0.40), radius: 4)
-                    .padding(.leading, edgePadding)
+                    .padding(isLeft ? .leading : .trailing, edgePadding)
                     .padding(.top, max(0, topPadding - 1))
                 }
             }
@@ -436,7 +431,7 @@ private struct CompactCodexTaskStatusOverlay: View {
     }
 
     private var shouldShow: Bool {
-        store.enabled && !visibility.claudeVisible && visibility.codexVisible
+        store.enabled && visibility.selected.count == 1
     }
 
     private var statusColor: Color {

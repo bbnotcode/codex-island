@@ -15,9 +15,13 @@ struct PanelHeader: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            title(visibility.left, isLeft: true)
+            if let left = visibility.leftSlot {
+                title(left, isLeft: true)
+            } else {
+                Color.clear.frame(maxWidth: .infinity)
+            }
             Color.clear.frame(width: notch.width)
-            if let right = visibility.right {
+            if let right = visibility.rightSlot {
                 title(right, isLeft: false)
             } else {
                 Color.clear.frame(maxWidth: .infinity)

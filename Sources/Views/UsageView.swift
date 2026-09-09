@@ -14,25 +14,28 @@ struct UsageView: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            providerBlock(visibility.left)
+            slot(visibility.leftSlot)
             hairline
-            if let right = visibility.right {
-                providerBlock(right)
-            } else if let legacy = visibility.left.legacy {
-                if legacy == .codex && taskStatus.enabled {
-                    CodexTaskStatusView()
-                } else {
-                    PerModelBreakdown(provider: legacy, metric: .tokens)
-                        .frame(maxWidth: .infinity, alignment: .top)
-                        .padding(.horizontal, IslandPanelLayout.columnInset)
-                }
-            } else {
-                Color.clear.frame(maxWidth: .infinity)
-            }
+            slot(visibility.rightSlot)
         }
         .frame(height: IslandPanelLayout.tileHeight)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
         .padding(.horizontal, IslandPanelLayout.horizontalInset)
+    }
+
+    @ViewBuilder
+    private func slot(_ provider: IslandProvider?) -> some View {
+        if let provider {
+            providerBlock(provider)
+        } else if visibility.selected.count == 1, taskStatus.enabled {
+            CodexTaskStatusView()
+        } else if let legacy = visibility.selected.first?.legacy {
+            PerModelBreakdown(provider: legacy, metric: .tokens)
+                .frame(maxWidth: .infinity, alignment: .top)
+                .padding(.horizontal, IslandPanelLayout.columnInset)
+        } else {
+            Color.clear.frame(maxWidth: .infinity)
+        }
     }
 
     @ViewBuilder

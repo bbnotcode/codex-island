@@ -542,7 +542,7 @@ struct SettingsView: View {
             sectionLabel("Codex task status")
             SettingsRow(
                 title: "Codex task status",
-                subtitle: "Show local Codex task state when the Claude side is hidden."
+                subtitle: "Show local Codex task state in the empty side when one provider is selected."
             ) {
                 SettingsToggle(isOn: codexTaskStatus.enabled) {
                     codexTaskStatus.enabled.toggle()

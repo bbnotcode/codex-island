@@ -121,6 +121,7 @@
 "Switch to %@ (⌘%d)" = "切换到%@（⌘%d）";
 "Codex task status" = "Codex 任务状态";
 "Show local Codex task state when the Claude side is hidden." = "隐藏 Claude 一侧时显示本地 Codex 任务状态。";
+"Show local Codex task state in the empty side when one provider is selected." = "仅选择一个提供方时，在空出的一侧显示本地 Codex 任务状态。";
 "Running" = "运行中";
 "Running short" = "运行";
 "Waiting for approval" = "等待审批";

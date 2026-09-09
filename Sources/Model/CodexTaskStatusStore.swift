@@ -152,7 +152,7 @@ final class CodexTaskStatusStore: ObservableObject {
             visibility.$selected
         )
         .map { enabled, selected in
-            enabled && !selected.contains(.claude) && selected.contains(.codex)
+            enabled && selected.count == 1
         }
         .removeDuplicates()
         .receive(on: DispatchQueue.main)
@@ -465,7 +465,7 @@ final class CodexTaskStatusStore: ObservableObject {
 
     private var isRenderable: Bool {
         let visibility = ProviderVisibilityStore.shared
-        return enabled && !visibility.claudeVisible && visibility.codexVisible
+        return enabled && visibility.selected.count == 1
     }
 
     private struct ScanResult: Sendable {

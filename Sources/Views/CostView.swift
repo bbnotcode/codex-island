@@ -11,19 +11,26 @@ struct CostView: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            providerBlock(visibility.left)
+            slot(visibility.leftSlot)
             hairline
-            if let right = visibility.right {
-                providerBlock(right)
-            } else {
-                breakdown(for: visibility.left)
-                    .frame(maxWidth: .infinity, alignment: .top)
-                    .padding(.horizontal, IslandPanelLayout.columnInset)
-            }
+            slot(visibility.rightSlot)
         }
         .frame(height: IslandPanelLayout.tileHeight)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
         .padding(.horizontal, IslandPanelLayout.horizontalInset)
+    }
+
+    @ViewBuilder
+    private func slot(_ provider: IslandProvider?) -> some View {
+        if let provider {
+            providerBlock(provider)
+        } else if let legacy = visibility.selected.first?.legacy {
+            breakdown(for: legacy)
+                .frame(maxWidth: .infinity, alignment: .top)
+                .padding(.horizontal, IslandPanelLayout.columnInset)
+        } else {
+            Color.clear.frame(maxWidth: .infinity)
+        }
     }
 
     @ViewBuilder
@@ -39,7 +46,7 @@ struct CostView: View {
         } else {
             CostBlock(color: provider.color, cost: cost,
                           loading: store.isLoading(provider), provider: provider.costProvider,
-                          centerWhenSingle: visibility.right == nil)
+                          centerWhenSingle: visibility.selected.count == 1)
             .help(store.localNotices[provider] ?? "Estimated API-equivalent cost from local CLI records; not a subscription charge.")
         }
     }

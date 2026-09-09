@@ -121,6 +121,7 @@
 "Switch to %@ (⌘%d)" = "Switch to %@ (⌘%d)";
 "Codex task status" = "Codex task status";
 "Show local Codex task state when the Claude side is hidden." = "Show local Codex task state when the Claude side is hidden.";
+"Show local Codex task state in the empty side when one provider is selected." = "Show local Codex task state in the empty side when one provider is selected.";
 "Running" = "Running";
 "Running short" = "Running";
 "Waiting for approval" = "Waiting for approval";

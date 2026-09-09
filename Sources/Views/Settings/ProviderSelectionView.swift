@@ -15,7 +15,7 @@ struct ProviderSelectionView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             HStack(alignment: .bottom, spacing: 10) {
-                slot(0, provider: selection.left)
+                slot(0, provider: selection.leftSlot)
                 Button {
                     withAnimation(reduceMotion ? nil : .openMorph) { selection.swap() }
                 } label: {
@@ -23,11 +23,11 @@ struct ProviderSelectionView: View {
                         .frame(width: 32, height: 44)
                 }
                 .buttonStyle(.plain)
-                .disabled(selection.right == nil)
-                .opacity(selection.right == nil ? 0.3 : 1)
+                .disabled(selection.selected.count < 2)
+                .opacity(selection.selected.count < 2 ? 0.3 : 1)
                 .help(L10n.tr("Swap left and right"))
                 .accessibilityLabel(L10n.tr("Swap left and right"))
-                slot(1, provider: selection.right)
+                slot(1, provider: selection.rightSlot)
             }
             Divider().overlay(Color.primary.opacity(0.08))
             ForEach(selection.selected) { provider in
@@ -53,12 +53,11 @@ struct ProviderSelectionView: View {
                             if candidate == provider { Label(candidate.name, systemImage: "checkmark") }
                             else { Text(candidate.name) }
                         }
-                        .disabled(index == 1 && selection.right == nil && candidate == selection.left)
                     }
-                    if index == 1 {
+                    if selection.selected.count == 2 {
                         Divider()
                         Button(L10n.tr("None — use one provider")) {
-                            withAnimation(reduceMotion ? nil : .openMorph) { selection.set(nil, at: 1) }
+                            withAnimation(reduceMotion ? nil : .openMorph) { selection.set(nil, at: index) }
                         }
                     }
                 } label: {

@@ -4,12 +4,16 @@ import Foundation
 final class ProviderVisibilityStore: ObservableObject {
     static let shared = ProviderVisibilityStore()
     static let selectionKey = "MacIsland.selectedProviders"
+    static let singleSlotKey = "MacIsland.singleProviderSlot"
 
     @Published private(set) var selected: [IslandProvider]
+    @Published private(set) var singleProviderSlot: Int
     private let defaults: UserDefaults
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
+        singleProviderSlot = defaults.object(forKey: Self.singleSlotKey) == nil
+            ? 0 : min(1, max(0, defaults.integer(forKey: Self.singleSlotKey)))
         if let saved = defaults.stringArray(forKey: Self.selectionKey) {
             self.selected = Self.normalized(saved.compactMap(IslandProvider.init(rawValue:)))
         } else {
@@ -23,6 +27,8 @@ final class ProviderVisibilityStore: ObservableObject {
 
     var left: IslandProvider { selected.first ?? .claude }
     var right: IslandProvider? { selected.count == 2 ? selected[1] : nil }
+    var leftSlot: IslandProvider? { provider(at: 0) }
+    var rightSlot: IslandProvider? { provider(at: 1) }
     var claudeVisible: Bool { selected.contains(.claude) }
     var codexVisible: Bool { selected.contains(.codex) }
 
@@ -38,8 +44,20 @@ final class ProviderVisibilityStore: ObservableObject {
     func set(_ provider: IslandProvider?, at slot: Int) {
         guard (0...1).contains(slot) else { return }
         guard let provider else {
-            guard slot == 1 else { return }
-            selected = [left]
+            guard selected.count == 2 else { return }
+            selected.remove(at: slot)
+            singleProviderSlot = 1 - slot
+            persist()
+            return
+        }
+        if selected.count == 1 {
+            if selected[0] == provider {
+                singleProviderSlot = slot
+            } else if singleProviderSlot == slot {
+                selected = [provider]
+            } else {
+                selected = slot == 0 ? [provider, selected[0]] : [selected[0], provider]
+            }
             persist()
             return
         }
@@ -61,5 +79,11 @@ final class ProviderVisibilityStore: ObservableObject {
 
     private func persist() {
         defaults.set(selected.map(\.rawValue), forKey: Self.selectionKey)
+        defaults.set(singleProviderSlot, forKey: Self.singleSlotKey)
+    }
+
+    private func provider(at slot: Int) -> IslandProvider? {
+        if selected.count == 2 { return selected[slot] }
+        return singleProviderSlot == slot ? selected.first : nil
     }
 }
