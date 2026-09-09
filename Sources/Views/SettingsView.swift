@@ -67,7 +67,7 @@ struct SettingsView: View {
 
             SettingsFooter()
         }
-        .frame(minWidth: 440, minHeight: 420)
+        .frame(minWidth: 440, minHeight: 560)
         .background(Color(red: 0.020, green: 0.020, blue: 0.027))
         .preferredColorScheme(.dark)
     }
@@ -490,36 +490,7 @@ struct SettingsView: View {
     }
 
     private var providersSection: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            sectionLabel("Providers")
-            SettingsRow(
-                title: "Claude",
-                subtitle: providerSubtitle(usage.claude),
-                dot: IslandColor.claude,
-                chip: usage.claude.plan?.uppercased()
-            ) {
-                SettingsToggle(isOn: visibility.claudeVisible) {
-                    withAnimation(.openMorph) {
-                        visibility.claudeVisible.toggle()
-                    }
-                }
-            }
-            SettingsRow(
-                title: "Codex",
-                subtitle: providerSubtitle(usage.codex),
-                dot: IslandColor.codex,
-                chip: usage.codex.plan?.uppercased()
-            ) {
-                SettingsToggle(isOn: visibility.codexVisible) {
-                    withAnimation(.openMorph) {
-                        visibility.codexVisible.toggle()
-                    }
-                }
-            }
-        }
-        .padding(.horizontal, 14)
-        .padding(.top, 18)
-        .padding(.bottom, 6)
+        ProviderSelectionView()
     }
 
     /// Lets the user pick which token total drives the TOKENS hero on the

@@ -36,7 +36,8 @@ enum UsageFetcher {
             return AppUsage(
                 fiveHour: windows.fiveHour,
                 weekly: windows.weekly,
-                plan: obj["plan_type"] as? String
+                plan: obj["plan_type"] as? String,
+                reportedWindows: windows.reported
             )
         } catch {
             return errorPair(error.localizedDescription)
@@ -66,7 +67,7 @@ enum UsageFetcher {
     /// each reported window by its advertised span instead — a day cleanly
     /// separates 5h (18000s) from weekly (604800s) — and fall back to slot
     /// order for older shapes that omit `limit_window_seconds`.
-    static func routeCodexWindows(_ rl: [String: Any]) -> (fiveHour: WindowUsage, weekly: WindowUsage) {
+    static func routeCodexWindows(_ rl: [String: Any]) -> (fiveHour: WindowUsage, weekly: WindowUsage, reported: [UsageWindow]) {
         var fiveHour: WindowUsage?
         var weekly: WindowUsage?
         let slots: [(key: String, fallback: UsageWindow)] = [
@@ -85,7 +86,10 @@ enum UsageFetcher {
             case .weekly:   if weekly == nil { weekly = parseCodexWindow(d) }
             }
         }
-        return (fiveHour ?? .unknown, weekly ?? .unknown)
+        var reported: [UsageWindow] = []
+        if fiveHour != nil { reported.append(.fiveHour) }
+        if weekly != nil { reported.append(.weekly) }
+        return (fiveHour ?? .unknown, weekly ?? .unknown, reported)
     }
 
     private static func parseCodexWindow(_ obj: Any?) -> WindowUsage {

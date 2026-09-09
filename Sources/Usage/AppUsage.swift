@@ -1,6 +1,6 @@
 import Foundation
 
-/// The two rate-limit windows every provider reports. Named here rather than
+/// Standard rate-limit windows. A provider may report only one. Named here rather than
 /// beside the history store because they name `AppUsage`'s own two fields —
 /// and so the pure value layer stays free of store dependencies.
 enum UsageWindow: String, Codable {
@@ -72,19 +72,38 @@ struct AppUsage {
     /// or Codex's `plan_type` (free/plus/pro). nil when unknown.
     var plan: String?
 
-    init(fiveHour: WindowUsage, weekly: WindowUsage, plan: String? = nil) {
+    // nil means no successful window discovery yet, not a two-window plan.
+    var reportedWindows: [UsageWindow]?
+
+    init(fiveHour: WindowUsage, weekly: WindowUsage, plan: String? = nil,
+         reportedWindows: [UsageWindow]? = nil) {
         self.fiveHour = fiveHour
         self.weekly = weekly
         self.plan = plan
+        self.reportedWindows = reportedWindows
     }
 
     static let empty = AppUsage(fiveHour: .unknown, weekly: .unknown)
 
-    var peekWindow: WindowUsage { fiveHour.hasReading ? fiveHour : weekly }
+    var visibleWindows: [UsageWindow] {
+        let order: [UsageWindow] = [.fiveHour, .weekly]
+        if let reportedWindows { return order.filter { reportedWindows.contains($0) } }
+        return order.filter { !window($0).isUnreported }
+    }
+
+    func window(_ kind: UsageWindow) -> WindowUsage {
+        kind == .fiveHour ? fiveHour : weekly
+    }
+
+    var peekWindow: WindowUsage { peekWindowIsWeekly ? weekly : fiveHour }
 
     /// Which window `peekWindow` selected — the peek chrome (VoiceOver label,
     /// window-length fallback glyph) must describe the same window it shows.
-    var peekWindowIsWeekly: Bool { !fiveHour.hasReading }
+    var peekWindowIsWeekly: Bool {
+        if visibleWindows == [.fiveHour] { return false }
+        if visibleWindows == [.weekly] { return true }
+        return !fiveHour.hasReading
+    }
 
     /// Fold a fetch result into the values currently on screen.
     ///
@@ -105,7 +124,8 @@ struct AppUsage {
             weekly: carryForward(fetched.weekly, prior: prior.weekly, at: now),
             // Plan tier is read from the credential store, not the usage
             // response, so a failed fetch shouldn't blank the chip's badge.
-            plan: fetched.plan ?? prior.plan
+            plan: fetched.plan ?? prior.plan,
+            reportedWindows: fetched.reportedWindows ?? prior.reportedWindows
         )
     }
 
