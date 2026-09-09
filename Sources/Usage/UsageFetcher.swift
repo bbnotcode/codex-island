@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 
 enum UsageFetcher {
     // MARK: - Codex
@@ -12,6 +13,7 @@ enum UsageFetcher {
         }
 
         var req = URLRequest(url: URL(string: "https://chatgpt.com/backend-api/wham/usage")!)
+        req.timeoutInterval = 15
         req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
 
         do {
@@ -32,10 +34,12 @@ enum UsageFetcher {
                   let rl = obj["rate_limit"] as? [String: Any] else {
                 return errorPair("parse error")
             }
+            let windows = routeCodexWindows(rl)
             return AppUsage(
-                fiveHour: parseCodexWindow(rl["primary_window"]),
-                weekly: parseCodexWindow(rl["secondary_window"]),
-                plan: obj["plan_type"] as? String
+                fiveHour: windows.fiveHour,
+                weekly: windows.weekly,
+                plan: obj["plan_type"] as? String,
+                reportedWindows: windows.reported
             )
         } catch {
             return errorPair(error.localizedDescription)
@@ -51,16 +55,64 @@ enum UsageFetcher {
 
     private static func readCodexAccessToken() -> String? {
         let path = NSString("~/.codex/auth.json").expandingTildeInPath
-        guard let data = try? Data(contentsOf: URL(fileURLWithPath: path)),
+        guard let data = readCredentialFile(atPath: path),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let tokens = json["tokens"] as? [String: Any],
               let token = tokens["access_token"] as? String else { return nil }
         return token
     }
 
+    private static func readCredentialFile(atPath path: String) -> Data? {
+        let fm = FileManager.default
+        guard let attributes = try? fm.attributesOfItem(atPath: path),
+              attributes[.type] as? FileAttributeType == .typeRegular,
+              (attributes[.ownerAccountID] as? NSNumber)?.uint32Value == getuid(),
+              (attributes[.size] as? NSNumber)?.uint64Value ?? .max <= 1_048_576,
+              let values = try? URL(fileURLWithPath: path).resourceValues(
+                forKeys: [.isSymbolicLinkKey]
+              ),
+              values.isSymbolicLink != true
+        else { return nil }
+        return try? Data(contentsOf: URL(fileURLWithPath: path), options: .mappedIfSafe)
+    }
+
+    /// The window slots stopped being positional in mid-2026: plans with a
+    /// single weekly limit report it as `primary_window` with
+    /// `limit_window_seconds: 604800` and `secondary_window: null`, so
+    /// primary→5h / secondary→weekly mislabels the only real reading. Route
+    /// each reported window by its advertised span instead — a day cleanly
+    /// separates 5h (18000s) from weekly (604800s) — and fall back to slot
+    /// order for older shapes that omit `limit_window_seconds`.
+    static func routeCodexWindows(_ rl: [String: Any]) -> (fiveHour: WindowUsage, weekly: WindowUsage, reported: [UsageWindow]) {
+        var fiveHour: WindowUsage?
+        var weekly: WindowUsage?
+        let slots: [(key: String, fallback: UsageWindow)] = [
+            ("primary_window", .fiveHour),
+            ("secondary_window", .weekly),
+        ]
+        for (key, fallback) in slots {
+            guard let d = rl[key] as? [String: Any] else { continue }
+            let span = d["limit_window_seconds"] as? Double
+            let kind = span.map { $0 >= 86400 ? UsageWindow.weekly : .fiveHour } ?? fallback
+            // Same-kind collision: the earlier slot wins. Primary is the
+            // provider's headline window — a trailing sibling silently
+            // overwriting it would drop the real reading.
+            switch kind {
+            case .fiveHour: if fiveHour == nil { fiveHour = parseCodexWindow(d) }
+            case .weekly:   if weekly == nil { weekly = parseCodexWindow(d) }
+            }
+        }
+        var reported: [UsageWindow] = []
+        if fiveHour != nil { reported.append(.fiveHour) }
+        if weekly != nil { reported.append(.weekly) }
+        return (fiveHour ?? .unknown, weekly ?? .unknown, reported)
+    }
+
     private static func parseCodexWindow(_ obj: Any?) -> WindowUsage {
-        guard let d = obj as? [String: Any] else { return .unknown }
-        let used = (d["used_percent"] as? Double) ?? 0
+        guard let d = obj as? [String: Any],
+              let used = d["used_percent"] as? Double,
+              used.isFinite
+        else { return .unknown }
         let resetAt = (d["reset_at"] as? Double).map { Date(timeIntervalSince1970: $0) }
         return WindowUsage(usedPercent: used / 100, resetAt: resetAt, error: nil)
     }
@@ -69,6 +121,7 @@ enum UsageFetcher {
         guard let token = readCodexAccessToken() else { return nil }
 
         var req = URLRequest(url: URL(string: "https://chatgpt.com/backend-api/wham/rate-limit-reset-credits")!)
+        req.timeoutInterval = 15
         req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         req.setValue("application/json", forHTTPHeaderField: "Accept")
 
@@ -132,6 +185,7 @@ enum UsageFetcher {
 
     private static func fetchClaudeUsage(token: String, plan: String?) async -> ClaudeCredentials.ProbeOutcome {
         var req = URLRequest(url: URL(string: "https://api.anthropic.com/api/oauth/usage")!)
+        req.timeoutInterval = 15
         req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         req.setValue("oauth-2025-04-20", forHTTPHeaderField: "anthropic-beta")
         req.setValue("application/json", forHTTPHeaderField: "Accept")
@@ -171,13 +225,15 @@ enum UsageFetcher {
     }
 
     private static func parseClaudeWindow(_ obj: Any?) -> WindowUsage {
-        guard let d = obj as? [String: Any] else { return .unknown }
+        guard let d = obj as? [String: Any],
+              let raw = (d["utilization"] as? Double) ?? (d["used_percent"] as? Double),
+              raw.isFinite
+        else { return .unknown }
         // Anthropic returns `utilization` as a percentage in [0, 100], not a
         // normalized [0, 1] fraction. An earlier `raw > 1 ? raw / 100 : raw`
         // heuristic broke the moment the 5h window reset: utilization values
         // in (0, 1] (e.g. 0.5% used → 0.5) were treated as already-normalized
         // and rendered as 50%–100%. Always divide by 100; clamp below.
-        let raw = (d["utilization"] as? Double) ?? (d["used_percent"] as? Double) ?? 0
         let normalized = raw / 100.0
         var resetAt: Date?
         if let r = d["resets_at"] as? Double {

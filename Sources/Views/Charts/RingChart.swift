@@ -5,12 +5,13 @@ struct RingChart: View {
     let color: Color
     let label: String
     let sub: String
+    var centered = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: centered ? .center : .leading, spacing: 8) {
             HStack(spacing: 14) {
                 ZStack {
-                    Circle().stroke(.white.opacity(0.07), lineWidth: 3)
+                    Circle().stroke(Color.primary.opacity(0.07), lineWidth: 3)
                     Circle()
                         .trim(from: 0, to: max(0.001, value / 100))
                         .stroke(color, style: StrokeStyle(lineWidth: 3, lineCap: .round))
@@ -21,12 +22,12 @@ struct RingChart: View {
                         // without ever flashing 0%.
                         .animation(.strongEaseOut, value: value)
                 }
-                .frame(width: 56, height: 56)
+                .frame(width: centered ? 64 : 56, height: centered ? 64 : 56)
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(label)
                         .font(Typography.label)
-                        .foregroundStyle(.white.opacity(0.55))
+                        .foregroundStyle(Color.primary.opacity(0.55))
                         .textCase(.lowercase)
                     HStack(alignment: .firstTextBaseline, spacing: 1) {
                         Text("\(Int(value))")
@@ -36,14 +37,14 @@ struct RingChart: View {
                             .animation(.strongEaseOut, value: value)
                         Text("%")
                             .font(Typography.label)
-                            .foregroundStyle(.white.opacity(0.5))
+                            .foregroundStyle(Color.primary.opacity(0.5))
                     }
                 }
-                Spacer()
+                if !centered { Spacer() }
             }
             Text(sub)
                 .font(Typography.caption)
-                .foregroundStyle(.white.opacity(0.4))
+                .foregroundStyle(Color.primary.opacity(0.60))
                 .lineLimit(1)
                 .truncationMode(.tail)
         }

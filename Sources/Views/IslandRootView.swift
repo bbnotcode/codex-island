@@ -3,19 +3,18 @@ import AppKit
 
 struct IslandRootView: View {
     @ObservedObject var model: IslandModel
+    @ObservedObject private var visibility = ProviderVisibilityStore.shared
     @ObservedObject private var alwaysShow = AlwaysShowUsageStore.shared
+    @ObservedObject private var appearanceStore = AppearanceStore.shared
+    @ObservedObject private var taskStatus = CodexTaskStatusStore.shared
     @State private var hovering = false
     @State private var contentVisible = false
     @State private var pillsVisible = false
     @State private var pulseToken: UUID?
-
-    /// Image decode from disk is ~150µs per call. Computed properties
-    /// re-decoded both logos every render — inside a 120Hz TimelineView
-    /// that's 240 main-thread decodes/sec. Cache once on appear.
-    @State private var claudeLogo: NSImage?
-    @State private var openaiLogo: NSImage?
+    @State private var collapseRequest = UUID()
 
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.colorScheme) private var systemColorScheme
 
     var body: some View {
         VStack(spacing: 0) {
@@ -29,19 +28,21 @@ struct IslandRootView: View {
             ZStack {
                 GlowLayer(
                     isExpanded: model.state == .expanded,
-                    hovering: hovering
+                    hovering: hovering,
+                    usesLightSurface: expandedUsesLightSurface
                 )
 
                 if model.state == .expanded {
                     ExpandedView(model: model)
+                        .modifier(ExpandedContentAppearance(
+                            usesLightPalette: expandedUsesLightSurface
+                        ))
                         .opacity(contentVisible ? 1 : 0)
                         // Slide down from -8 → 0 on enter pairs with the
-                        // 100ms→180ms opacity delay set in onHover. On
+                        // 100ms→180ms opacity delay set when opening. On
                         // exit the offset never matters because the
                         // content fully fades before the shape shrinks.
                         .offset(y: contentVisible ? 0 : -8)
-                        .padding(.horizontal, 18)
-                        .padding(.vertical, 14)
                         .allowsHitTesting(contentVisible)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
@@ -77,52 +78,39 @@ struct IslandRootView: View {
                     }
                 }
                 .overlay(alignment: .topLeading) {
-                    LogoOverlay(
-                        image: claudeLogo,
-                        color: IslandColor.claude,
-                        provider: .claude,
-                        edgePadding: logoEdgePadding,
-                        topPadding: max(0, (model.notch.height - 20) / 2)
-                    )
+                    if model.state != .expanded, let left = visibility.leftSlot {
+                        ProviderMark(provider: left)
+                            .padding(.leading, logoEdgePadding)
+                            .padding(.top, max(0, (model.notch.height - 20) / 2))
+                    }
+                }
+                .overlay(alignment: statusOverlayAlignment) {
+                    if model.state != .expanded {
+                        CompactCodexTaskStatusOverlay(
+                            edgePadding: logoEdgePadding,
+                            topPadding: max(0, (model.notch.height - 20) / 2),
+                            showsDetails: model.state == .peek,
+                            isLeft: visibility.leftSlot == nil
+                        )
+                    }
                 }
                 .overlay(alignment: .topTrailing) {
-                    LogoOverlay(
-                        image: openaiLogo,
-                        color: IslandColor.codex,
-                        provider: .codex,
-                        edgePadding: logoEdgePadding,
-                        topPadding: max(0, (model.notch.height - 20) / 2)
-                    )
+                    if model.state != .expanded, let right = visibility.rightSlot {
+                        ProviderMark(provider: right)
+                            .padding(.trailing, logoEdgePadding)
+                            .padding(.top, max(0, (model.notch.height - 20) / 2))
+                    }
                 }
                 .overlay(alignment: .topLeading) {
-                    // Pill lives in the new outboard slot (the width the
-                    // silhouette grew on entering peek). 14pt inset from the
-                    // silhouette's new leading edge keeps it visually
-                    // breathing inside the rounded corner.
-                    if model.state != .compact {
-                        PeekPillOverlay(
-                            provider: .claude,
-                            topPadding: max(0, (model.notch.height - 14) / 2),
-                            pillsVisible: pillsVisible
-                        )
+                    if model.state != .compact, let left = visibility.leftSlot {
+                        PeekPillOverlay(provider: left, isLeft: true,
+                            topPadding: max(0, (model.notch.height - 14) / 2), pillsVisible: pillsVisible)
                     }
                 }
                 .overlay(alignment: .topTrailing) {
-                    if model.state != .compact {
-                        PeekPillOverlay(
-                            provider: .codex,
-                            topPadding: max(0, (model.notch.height - 14) / 2),
-                            pillsVisible: pillsVisible
-                        )
-                    }
-                }
-                .overlay(alignment: .bottomLeading) {
-                    // Utility control, not dashboard status. Keep it in a
-                    // quiet corner so the footer remains about live data.
-                    if model.state == .expanded {
-                        SettingsButton()
-                            .opacity(contentVisible ? 1 : 0)
-                            .padding(6)
+                    if model.state != .compact, let right = visibility.rightSlot {
+                        PeekPillOverlay(provider: right, isLeft: false,
+                            topPadding: max(0, (model.notch.height - 14) / 2), pillsVisible: pillsVisible)
                     }
                 }
                 .contentShape(IslandShape())
@@ -139,95 +127,15 @@ struct IslandRootView: View {
                         }
                         return
                     }
-                    // Plain click: enter the full panel. Works from .peek
-                    // (the common case after hover) or .compact (cold click).
-                    // Pills travel outward with the growing shape under the
-                    // single openMorph spring, then quietly retire after the
-                    // expanded content has settled.
-                    guard model.state == .peek || model.state == .compact else { return }
-                    withAnimation(.openMorph) {
-                        model.setState(.expanded)
-                    }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
-                        guard model.state == .expanded else { return }
-                        withAnimation(.strongEaseOut) {
-                            contentVisible = true
-                        }
-                    }
-                    // Guard against a hover-out landing inside the 250ms
-                    // wait: under always-show it restores the pills at peek,
-                    // and this stale callback would hide them again — leaving
-                    // the rest state pill-less until the next hover cycle.
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-                        guard model.state == .expanded else { return }
-                        withAnimation(.easeOut(duration: 0.18)) {
-                            pillsVisible = false
-                        }
-                    }
                 }
                 .onHover { h in
                     hovering = h
                     if h {
-                        // Trackpad tap on hover-in. .levelChange is closer to
-                        // a volume-key tick than the .generic notification
-                        // pattern. No-op if haptics are off.
-                        NSHapticFeedbackManager.defaultPerformer.perform(
-                            .levelChange, performanceTime: .now
-                        )
-                        // PEEK ENTER: shape morphs out to peek width. Pills
-                        // fade in 60ms later so the eye sees the shape commit
-                        // first, then content arrives. Hover does NOT open
-                        // the full panel — that requires a click.
-                        if model.state == .compact {
-                            withAnimation(.openMorph) {
-                                model.setState(.peek)
-                            }
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.06) {
-                                guard model.state == .peek else { return }
-                                withAnimation(.easeOut(duration: 0.18)) {
-                                    pillsVisible = true
-                                }
-                            }
-                        }
-                    } else {
-                        // EXIT: pills fade first (unless we're pinning peek),
-                        // then the shape settles at the rest state — `.compact`
-                        // normally, `.peek` under always-show.
-                        if !alwaysShow.enabled {
-                            withAnimation(.easeOut(duration: 0.08)) {
-                                pillsVisible = false
-                            }
-                        }
-                        withAnimation(.easeOut(duration: 0.10)) {
-                            contentVisible = false
-                        }
-                        // Start the shape morph after only 20ms — overlapping
-                        // with the content fade — so the silhouette begins
-                        // shrinking while the content is still fading out.
-                        // The original 100ms wait caused a visible "flash black"
-                        // because the full-size black shape was exposed for the
-                        // entire fade before the closeMorph fired.
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) {
-                            guard !hovering else { return }
-                            // Re-read restState here — the user may have flipped
-                            // the always-show toggle during the 20ms wait, and
-                            // a captured-at-creation-time `target` would settle
-                            // at the wrong state for them.
-                            let target = restState
-                            if model.state != target {
-                                withAnimation(.closeMorph) {
-                                    model.setState(target)
-                                }
-                            }
-                            // Coming out of `.expanded` under always-show, the
-                            // pills were hidden by the open-panel branch — bring
-                            // them back as the shape resettles at peek.
-                            if alwaysShow.enabled && !pillsVisible {
-                                withAnimation(.easeOut(duration: 0.18)) {
-                                    pillsVisible = true
-                                }
-                            }
-                        }
+                        // Re-entering an expanded panel cancels a pending
+                        // hover-exit collapse. Hover alone never expands.
+                        collapseRequest = UUID()
+                    } else if model.state == .expanded {
+                        scheduleCollapseAfterHoverExit()
                     }
                 }
             Spacer(minLength: 0)
@@ -237,14 +145,6 @@ struct IslandRootView: View {
         .accessibilityLabel(L10n.tr("CodexIsland panel"))
         .accessibilityHint(accessibilityHintForState)
         .onAppear {
-            if claudeLogo == nil {
-                claudeLogo = Bundle.main.url(forResource: "claude_logo", withExtension: "pdf")
-                    .flatMap { NSImage(contentsOf: $0) }
-            }
-            if openaiLogo == nil {
-                openaiLogo = Bundle.main.url(forResource: "openai_logo", withExtension: "pdf")
-                    .flatMap { NSImage(contentsOf: $0) }
-            }
             // Snap to peek on launch when the user has opted into always-show.
             // No animation here — the window is just becoming visible, so the
             // user sees the silhouette appear already at peek width rather
@@ -298,13 +198,26 @@ struct IslandRootView: View {
             // crossing tick.
             AlertEngine.shared.pulseEvent = nil
         }
+        .onReceive(NotificationCenter.default.publisher(for: .islandRightClickRequested)) { _ in
+            NSHapticFeedbackManager.defaultPerformer.perform(
+                .levelChange, performanceTime: .now
+            )
+            expandPanel()
+        }
     }
 
     /// Force-extends the island into peek state for ~4s when the alert
     /// engine signals a fresh threshold crossing. Suppressed when the panel
     /// is already expanded — the user is already looking at the data.
     private func handlePulse(_ event: AlertEngine.PulseEvent) {
-        guard model.state != .expanded else { return }
+        if model.state == .expanded {
+            if !contentVisible {
+                withAnimation(.strongEaseOut) {
+                    contentVisible = true
+                }
+            }
+            return
+        }
 
         if model.state == .compact {
             withAnimation(.openMorph) {
@@ -345,13 +258,70 @@ struct IslandRootView: View {
         alwaysShow.enabled ? .peek : .compact
     }
 
+    private func expandPanel() {
+        // Invalidates any delayed collapse that was scheduled on a brief
+        // pointer exit while the shape was morphing.
+        collapseRequest = UUID()
+        guard model.state != .expanded else { return }
+
+        withAnimation(.easeOut(duration: 0.08)) {
+            pillsVisible = false
+        }
+        withAnimation(.openMorph) {
+            model.setState(.expanded)
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.14) {
+            guard model.state == .expanded else { return }
+            withAnimation(.strongEaseOut) {
+                contentVisible = true
+            }
+        }
+    }
+
+    private func scheduleCollapseAfterHoverExit() {
+        // 1.5s is long enough to cross a small pointer gap or return after an
+        // accidental exit, without leaving the expanded dashboard hanging.
+        let request = UUID()
+        collapseRequest = request
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            guard collapseRequest == request, !hovering else { return }
+            withAnimation(.easeOut(duration: 0.12)) {
+                contentVisible = false
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
+                guard collapseRequest == request, !hovering else { return }
+                let target = restState
+                withAnimation(.closeMorph) {
+                    model.setState(target)
+                }
+                if target == .peek {
+                    withAnimation(.easeOut(duration: 0.18)) {
+                        pillsVisible = true
+                    }
+                }
+            }
+        }
+    }
+
+    private var expandedUsesLightSurface: Bool {
+        switch appearanceStore.appearance {
+        case .light: return true
+        case .dark: return false
+        case .system: return systemColorScheme == .light
+        }
+    }
+
+    private var statusOverlayAlignment: Alignment {
+        visibility.leftSlot == nil ? .topLeading : .topTrailing
+    }
+
     private var accessibilityHintForState: String {
         switch model.state {
         case .compact:
             return alwaysShow.enabled
-                ? L10n.tr("Click to expand. Command-click to cycle visualization.")
-                : L10n.tr("Hover to peek usage. Click to expand. Command-click to cycle visualization.")
-        case .peek:     return L10n.tr("Click to expand. Command-click to cycle visualization.")
+                ? L10n.tr("Right-click to expand. Move away to collapse.")
+                : L10n.tr("Right-click to expand. Move away to collapse.")
+        case .peek:     return L10n.tr("Right-click to expand. Move away to collapse.")
         case .expanded:
             return ScreenPref.shared.screen == .overview
                 ? L10n.tr("Swipe to change pages.")
@@ -373,6 +343,126 @@ struct IslandRootView: View {
     }
 }
 
+/// Uses the hidden Claude logo slot for a compact Codex task signal. This
+/// keeps the collapsed silhouette visually balanced without adding text or
+/// changing its width. The expanded panel continues to use the full status
+/// card.
+private struct CompactCodexTaskStatusOverlay: View {
+    let edgePadding: CGFloat
+    let topPadding: CGFloat
+    let showsDetails: Bool
+    let isLeft: Bool
+
+    @ObservedObject private var visibility = ProviderVisibilityStore.shared
+    @ObservedObject private var store = CodexTaskStatusStore.shared
+
+    var body: some View {
+        if shouldShow {
+            Group {
+                if showsDetails || store.snapshot.status.shouldForceCompactLabel {
+                    ZStack {
+                        HStack(spacing: 0) {
+                            Group {
+                                if store.snapshot.status == .idle {
+                                    Text(Duration.compact(0))
+                                } else {
+                                    TimelineView(.periodic(from: .now, by: 30)) { context in
+                                        Text(elapsedUpdate(at: context.date))
+                                    }
+                                }
+                            }
+                                    .font(Typography.bodyNumber)
+                                    .foregroundStyle(statusColor)
+                                    .frame(width: 50, alignment: .center)
+
+                            Group {
+                                if store.displayMode == .iconAndText
+                                    || store.snapshot.status.shouldForceCompactLabel {
+                                    Text(compactStatusLabel)
+                                        .font(Typography.bodyNumber)
+                                        .foregroundStyle(.white.opacity(0.68))
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.75)
+                                } else {
+                                    Color.clear
+                                }
+                            }
+                            .frame(width: 62, alignment: .center)
+
+                            CodexTaskStatusGlyph(
+                                status: store.snapshot.status,
+                                size: 22,
+                                showsBackground: false
+                            )
+                            .shadow(color: statusColor.opacity(0.40), radius: 4)
+                            .frame(width: 44, alignment: .center)
+                        }
+
+                        if store.displayMode == .iconAndText
+                            || store.snapshot.status.shouldForceCompactLabel {
+                            Text("·")
+                                .font(Typography.bodyNumber)
+                                .foregroundStyle(.white.opacity(0.32))
+                                .offset(x: -31)
+                        }
+                    }
+                    .frame(width: 156)
+                    .padding(isLeft ? .leading : .trailing, edgePadding)
+                    .padding(.top, max(0, topPadding - 1))
+                    .offset(x: isLeft ? -121 : 121)
+                } else {
+                    CodexTaskStatusGlyph(
+                        status: store.snapshot.status,
+                        size: 22,
+                        showsBackground: false
+                    )
+                    .shadow(color: statusColor.opacity(0.40), radius: 4)
+                    .padding(isLeft ? .leading : .trailing, edgePadding)
+                    .padding(.top, max(0, topPadding - 1))
+                }
+            }
+            .allowsHitTesting(false)
+            .help(L10n.tr("Codex status: %@", L10n.tr(store.snapshot.status.label)))
+            .accessibilityLabel(
+                L10n.tr("Codex status: %@", L10n.tr(store.snapshot.status.label))
+            )
+            .animation(.strongEaseOut, value: store.snapshot)
+        }
+    }
+
+    private var shouldShow: Bool {
+        store.enabled && visibility.selected.count == 1
+    }
+
+    private var statusColor: Color {
+        CodexTaskStatusGlyph.color(for: store.snapshot.status)
+    }
+
+    private var compactStatusLabel: String {
+        if store.snapshot.status == .waitingApproval {
+            return L10n.tr(
+                "Approval count %d",
+                store.snapshot.waitingApprovalTaskCount
+            )
+        }
+        if store.snapshot.status == .running,
+           store.snapshot.runningTaskCount > 1 {
+            return L10n.tr(
+                "Active count %d",
+                store.snapshot.runningTaskCount
+            )
+        }
+        return L10n.tr(store.snapshot.status.compactLabel)
+    }
+
+    private func elapsedUpdate(at now: Date) -> String {
+        guard store.snapshot.status == .running
+                || store.snapshot.status == .waitingApproval,
+              let date = store.snapshot.startedAt else { return "—" }
+        return Duration.compact(max(0, now.timeIntervalSince(date)))
+    }
+}
+
 /// Silhouette + halo + animated sweep. Bundles every layer whose
 /// appearance depends on alert severity or the Low Power Mode event
 /// predicate, so a UsageStore/AlertEngine/CostStore emission only
@@ -381,6 +471,7 @@ struct IslandRootView: View {
 private struct GlowLayer: View {
     let isExpanded: Bool
     let hovering: Bool
+    let usesLightSurface: Bool
 
     @ObservedObject private var usageStore = UsageStore.shared
     @ObservedObject private var costStore = CostStore.shared
@@ -397,11 +488,14 @@ private struct GlowLayer: View {
             )
 
             IslandShape()
-                .fill(.black)
+                .fill(isExpanded && usesLightSurface
+                    ? IslandColor.expandedLightBackground
+                    : .black)
                 .overlay {
                     IslandShape()
                         .strokeBorder(
-                            .white.opacity(isExpanded ? 0.12 : 0),
+                            (usesLightSurface ? Color.black : Color.white)
+                                .opacity(isExpanded ? 0.12 : 0),
                             lineWidth: 0.5
                         )
                 }
@@ -423,6 +517,7 @@ private struct GlowLayer: View {
                     color: isExpanded ? .black.opacity(0.5) : .clear,
                     radius: 20, y: 10
                 )
+                .animation(.easeInOut(duration: 0.20), value: usesLightSurface)
         }
     }
 
@@ -451,49 +546,20 @@ private struct GlowLayer: View {
     }
 }
 
-/// Per-provider brand logo overlay. Observes only ProviderVisibilityStore
-/// so a UsageStore/CostStore tick doesn't re-render the logo image or
-/// re-evaluate its accessibility label.
-private struct LogoOverlay: View {
-    let image: NSImage?
-    let color: Color
-    let provider: AlertEngine.Provider
-    let edgePadding: CGFloat
-    let topPadding: CGFloat
+/// Gives expanded content a real semantic color scheme. Compact and peek
+/// remain dark; expanded descendants resolve `Color.primary` and related
+/// hierarchy against the selected light/dark surface without altering brand
+/// or status hues.
+private struct ExpandedContentAppearance: ViewModifier {
+    let usesLightPalette: Bool
 
-    @ObservedObject private var visibility = ProviderVisibilityStore.shared
-
-    var body: some View {
-        // Hidden providers fully drop out — header / peek pill / chrome
-        // are gated identically. `.opacity(isVisible ? 1 : 0)` keeps the
-        // view in the layout (so other overlays don't reflow) but makes
-        // it invisible, and the explicit `.animation(.openMorph, value:)`
-        // pairs the chrome fade with the panel layout swap when the user
-        // toggles a provider in Settings.
-        if let image {
-            Image(nsImage: image)
-                .resizable()
-                .renderingMode(.template)
-                .aspectRatio(contentMode: .fit)
-                .foregroundStyle(color)
-                .frame(width: 20, height: 20)
-                .padding(provider == .claude ? .leading : .trailing, edgePadding)
-                .padding(.top, topPadding)
-                .opacity(isVisible ? 1 : 0)
-                .animation(.openMorph, value: isVisible)
-                .accessibilityLabel(isVisible ? providerLabel : L10n.tr("%@ (hidden)", providerLabel))
-                .accessibilityHidden(!isVisible)
-        }
-    }
-
-    private var isVisible: Bool {
-        visibility.effectiveVisible(provider: provider)
-    }
-
-    private var providerLabel: String {
-        switch provider {
-        case .claude: return "Claude"
-        case .codex:  return "OpenAI"
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if usesLightPalette {
+            content
+                .environment(\.colorScheme, .light)
+        } else {
+            content.environment(\.colorScheme, .dark)
         }
     }
 }
@@ -503,24 +569,29 @@ private struct LogoOverlay: View {
 /// scan completing doesn't re-render the pill that has no cost data
 /// in it.
 private struct PeekPillOverlay: View {
-    let provider: AlertEngine.Provider
+    let provider: IslandProvider
+    let isLeft: Bool
     let topPadding: CGFloat
     let pillsVisible: Bool
 
     @ObservedObject private var visibility = ProviderVisibilityStore.shared
+    @ObservedObject private var connections = ProviderConnectionStore.shared
+    @ObservedObject private var quotaPreferences = ProviderQuotaPreferences.shared
     @ObservedObject private var usageStore = UsageStore.shared
     @ObservedObject private var alerts = AlertEngine.shared
 
     var body: some View {
-        let window = currentWindow
+        let selected = currentWindow
         NotchPeekPill(
-            usage: window,
-            loading: usageStore.loading,
+            usage: selected.usage,
+            loading: provider.usesLegacyUsage ? usageStore.loading : connections.loading.contains(provider),
             tint: tint,
-            alignment: provider == .claude ? .leading : .trailing,
-            severity: severity
+            alignment: isLeft ? .leading : .trailing,
+            fallbackResetText: provider.usesLegacyUsage ? (selected.kind == .weekly ? "7d" : "5h") : "",
+            severity: severity,
+            showsAbsoluteResetTime: provider == .codex
         )
-        .padding(provider == .claude ? .leading : .trailing, 14)
+        .padding(isLeft ? .leading : .trailing, 14)
         .padding(.top, topPadding)
         // Two opacity bindings stack:
         //   - `pillsVisible` is the peek lifecycle (hover-in / hover-out).
@@ -530,9 +601,13 @@ private struct PeekPillOverlay: View {
         // lockstep with the rest of the chrome.
         .opacity((pillsVisible && isVisible) ? 1 : 0)
         .animation(.openMorph, value: isVisible)
-        .offset(x: pillsVisible ? 0 : (provider == .claude ? -6 : 6))
+        .offset(x: pillsVisible ? 0 : (isLeft ? -6 : 6))
         .allowsHitTesting(false)
-        .accessibilityLabel(peekLabel(for: window, provider: providerLabel))
+        .accessibilityLabel(peekLabel(
+            for: selected.usage,
+            kind: selected.kind,
+            provider: providerLabel
+        ))
         // Mirror the visual opacity gate exactly — both `pillsVisible` and
         // `isVisible` must be true for the pill to render. Keying the
         // accessibility hide on only `isVisible` lets VoiceOver reach a
@@ -541,55 +616,72 @@ private struct PeekPillOverlay: View {
     }
 
     private var isVisible: Bool {
-        visibility.effectiveVisible(provider: provider)
+        visibility.selected.contains(provider)
     }
 
-    private var currentWindow: WindowUsage {
+    private var currentWindow: (kind: UsageWindow, usage: WindowUsage) {
         switch provider {
-        case .claude: return usageStore.claude.fiveHour
-        case .codex:  return usageStore.codex.fiveHour
+        case .claude: return (.fiveHour, usageStore.claude.fiveHour)
+        case .codex:
+            let selected = usageStore.codex.preferredWindow
+            let resetAt = usageStore.codexResetCredits.nearestResetDate(
+                comparedTo: selected.usage.resetAt
+            )
+            return (
+                selected.kind,
+                WindowUsage(
+                    usedPercent: selected.usage.usedPercent,
+                    resetAt: resetAt,
+                    error: selected.usage.error
+                )
+            )
+        case .grok, .antigravity:
+            return (.fiveHour, connections.primary(provider)?.window ?? .unknown)
         }
     }
 
     private var severity: AlertEngine.Severity {
-        switch provider {
-        case .claude: return alerts.claudeSeverity
-        case .codex:  return alerts.codexSeverity
-        }
+        alerts.providerSeverities[provider] ?? .none
     }
 
-    private var tint: Color {
-        switch provider {
-        case .claude: return IslandColor.claude
-        case .codex:  return IslandColor.codex
-        }
-    }
+    private var tint: Color { provider.color }
+    private var providerLabel: String { provider.name }
 
-    private var providerLabel: String {
-        switch provider {
-        case .claude: return "Claude"
-        case .codex:  return "Codex"
+    private func peekLabel(
+        for window: WindowUsage,
+        kind: UsageWindow,
+        provider providerName: String
+    ) -> String {
+        let windowName = L10n.tr(kind == .fiveHour ? "5-hour" : "weekly")
+        if !self.provider.usesLegacyUsage {
+            guard window.hasReading else { return L10n.tr("%@: usage unavailable", providerName) }
+            return L10n.tr("%@: %d%%", providerName, window.displayedPercentInt(mode: UsageDisplayModeStore.shared.mode))
         }
-    }
-
-    private func peekLabel(for window: WindowUsage, provider: String) -> String {
         if !window.hasReading {
-            return L10n.tr("%@: no data for 5-hour window", provider)
+            return L10n.tr("%@: no data for %@ window", providerName, windowName)
         }
         let mode = UsageDisplayModeStore.shared.mode
         let pct = window.displayedPercentInt(mode: mode)
         guard let resetAt = window.resetAt else {
             return mode == .used
-                ? L10n.tr("%@: %d percent of 5-hour window used", provider, pct)
-                : L10n.tr("%@: %d percent of 5-hour window remaining", provider, pct)
+                ? L10n.tr("%@: %d percent of %@ window used", providerName, pct, windowName)
+                : L10n.tr("%@: %d percent of %@ window remaining", providerName, pct, windowName)
         }
-        let remaining = max(0, resetAt.timeIntervalSinceNow)
-        let resetPhrase: String = remaining >= 3600
-            ? L10n.tr("resets in %d hours", Int((remaining / 3600).rounded(.down)))
-            : L10n.tr("resets in %d minutes", max(1, Int((remaining / 60).rounded(.down))))
+        let resetPhrase: String
+        if provider == .codex {
+            resetPhrase = L10n.tr(
+                "resets at %@",
+                CodexResetCredits.localizedMinute(resetAt, locale: L10n.locale)
+            )
+        } else {
+            let remaining = max(0, resetAt.timeIntervalSinceNow)
+            resetPhrase = remaining >= 3600
+                ? L10n.tr("resets in %d hours", Int((remaining / 3600).rounded(.down)))
+                : L10n.tr("resets in %d minutes", max(1, Int((remaining / 60).rounded(.down))))
+        }
         return mode == .used
-            ? L10n.tr("%@: %d percent of 5-hour window used, %@", provider, pct, resetPhrase)
-            : L10n.tr("%@: %d percent of 5-hour window remaining, %@", provider, pct, resetPhrase)
+            ? L10n.tr("%@: %d percent of %@ window used, %@", providerName, pct, windowName, resetPhrase)
+            : L10n.tr("%@: %d percent of %@ window remaining, %@", providerName, pct, windowName, resetPhrase)
     }
 }
 

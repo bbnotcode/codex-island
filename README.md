@@ -43,7 +43,9 @@ providers' own usage endpoints.
   **Cost**, and **Overview**. Cost estimates today and month-to-date spend and
   token throughput from local Claude Code, Codex CLI, and OpenCode session
   data. Overview renders the current year's activity as a contribution-style
-  calendar.
+  calendar using logs from every supported provider, regardless of which
+  providers are selected for the usage pills. Click a provider in the calendar
+  legend to filter its history; click it again to show all providers.
 - **Used or remaining quota.** Display provider windows as usage consumed or
   quota remaining.
 - **Approaching-limit alerts.** Optional warning and critical thresholds tint
@@ -184,17 +186,32 @@ Settings is a custom `NSWindow`, not the system Settings scene. The app still
 runs as an accessory app with no Dock icon and no menu bar.
 
 - **General:** Launch at Login, 5m/15m/30m refresh interval, app language,
-  Always show usage, Low Power Mode, configurable limit alerts, and Sparkle
-  update controls.
+  light/dark/system appearance, Always show usage, Low Power Mode,
+  configurable limit alerts, and Sparkle update controls.
 - **Display:** used/remaining percentages, Usage and Cost visualization styles,
   target display, and island width on non-notched screens.
 - **Providers:** Claude/Codex visibility and status, token-counting mode, and a
-  manual refresh for local cost data.
+  manual refresh for local cost data. When Claude is hidden, an optional local
+  Codex task signal can fill the freed half.
 
 Preferences are stored in `UserDefaults` under `MacIsland.*` keys (Sparkle
 manages its own `SU*` update keys, and Launch at Login uses
-`SMAppService.mainApp`). Refresh, display, and provider changes apply live;
-changing the app language offers to restart CodexIsland.
+`SMAppService.mainApp`). Appearance, refresh, display, and provider changes
+apply live; changing the app language offers to restart CodexIsland.
+
+Codex task status is inferred locally from recent
+`~/.codex/sessions/**/*.jsonl` rollout lifecycle events. It reports only the
+states the current rollout format can support reliably: running, waiting for
+approval, idle, cancelled, error, or unavailable. Approval is detected from an
+unresolved `request_permissions` call. User-input waits are not claimed because
+current rollout files do not expose a reliable event for that state. The
+feature is off by default, polls only while enabled with Claude hidden and
+Codex visible, and never displays prompts, commands, or output.
+
+The compact and peek views are visual-only so their normal click-to-expand
+behavior is preserved. The expanded status card can open the related task in
+the Codex app when available. Disable the feature at any time to restore the
+original per-model token breakdown.
 
 ## Build from source
 

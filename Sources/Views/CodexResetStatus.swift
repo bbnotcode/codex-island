@@ -3,6 +3,7 @@ import SwiftUI
 struct CodexResetStatus: View {
     @ObservedObject private var usageStore = UsageStore.shared
     @ObservedObject private var visibility = ProviderVisibilityStore.shared
+    @Environment(\.colorScheme) private var colorScheme
 
     @State private var showPopover = false
     @State private var badgeHovered = false
@@ -33,20 +34,26 @@ struct CodexResetStatus: View {
     }
 
     private var badge: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "arrow.counterclockwise")
-                .font(Typography.caption)
-                .foregroundStyle(IslandColor.codex.opacity(badgeHovered || showPopover ? 1 : 0.8))
-            Text(resetAvailabilityText)
-                .font(Typography.caption)
-                .foregroundStyle(.white.opacity(badgeHovered || showPopover ? 0.85 : 0.55))
+        Button {
+            cancelHide()
+            showPopover.toggle()
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "arrow.counterclockwise")
+                    .font(Typography.caption)
+                    .foregroundStyle(IslandColor.codex.opacity(badgeHovered || showPopover ? 1 : 0.8))
+                Text(resetAvailabilityText)
+                    .font(Typography.caption)
+                    .foregroundStyle(Color.primary.opacity(badgeHovered || showPopover ? 0.85 : 0.55))
+            }
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
+            .background(
+                RoundedRectangle(cornerRadius: 5)
+                    .fill(Color.primary.opacity(badgeHovered || showPopover ? 0.05 : 0))
+            )
         }
-        .padding(.horizontal, 6)
-        .padding(.vertical, 3)
-        .background(
-            RoundedRectangle(cornerRadius: 5)
-                .fill(.white.opacity(badgeHovered || showPopover ? 0.05 : 0))
-        )
+        .buttonStyle(.plain)
         .contentShape(RoundedRectangle(cornerRadius: 5))
         .onHover { hovered in
             badgeHovered = hovered
@@ -54,7 +61,8 @@ struct CodexResetStatus: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(resetAvailabilityAccessibilityLabel)
-        .accessibilityHint(L10n.tr("Hover to show reset expiration details"))
+        .accessibilityHint(L10n.tr("Show reset expiration details"))
+        .accessibilityValue(showPopover ? L10n.tr("Expanded") : L10n.tr("Collapsed"))
         .animation(.hoverFade, value: badgeHovered)
         .animation(.hoverFade, value: showPopover)
     }
@@ -82,14 +90,14 @@ struct CodexResetStatus: View {
         .frame(width: 210, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 10)
-                .fill(.black)
+                .fill(colorScheme == .light ? IslandColor.expandedLightBackground : .black)
                 .overlay(
                     RoundedRectangle(cornerRadius: 10)
-                        .fill(.white.opacity(0.04))
+                        .fill(Color.primary.opacity(0.04))
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 10)
-                        .strokeBorder(.white.opacity(0.10), lineWidth: 0.5)
+                        .strokeBorder(Color.primary.opacity(0.10), lineWidth: 0.5)
                 )
         )
         .shadow(color: .black.opacity(0.5), radius: 16, y: 8)
@@ -108,12 +116,15 @@ struct CodexResetStatus: View {
             Text(L10n.tr("EXPIRES"))
                 .font(Typography.sectionLabel)
                 .tracking(0.8)
-                .foregroundStyle(.white.opacity(0.40))
+                .foregroundStyle(Color.primary.opacity(0.40))
             Spacer(minLength: 8)
 
-            Text(absolute(credit.expiresAt))
+            Text(CodexResetCredits.localizedMinute(
+                credit.expiresAt,
+                locale: L10n.locale
+            ))
                 .font(Typography.bodyNumber)
-                .foregroundStyle(.white.opacity(0.95))
+                .foregroundStyle(Color.primary.opacity(0.95))
                 .lineLimit(1)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -121,7 +132,7 @@ struct CodexResetStatus: View {
         .padding(.vertical, 6)
         .background(
             RoundedRectangle(cornerRadius: 6)
-                .fill(.white.opacity(0.05))
+                .fill(Color.primary.opacity(0.05))
         )
     }
 
@@ -158,15 +169,4 @@ struct CodexResetStatus: View {
         hideWorkItem = nil
     }
 
-    private static let absoluteFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.locale = L10n.locale
-        formatter.setLocalizedDateFormatFromTemplate("yMMMd")
-        return formatter
-    }()
-
-    private func absolute(_ date: Date) -> String {
-        Self.absoluteFormatter.locale = L10n.locale
-        return Self.absoluteFormatter.string(from: date)
-    }
 }

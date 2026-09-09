@@ -18,22 +18,26 @@ struct PanelFooter: View {
     @ObservedObject private var pref = StylePref.shared
     @ObservedObject private var costPref = CostStylePref.shared
     @ObservedObject private var screenPref = ScreenPref.shared
+    @ObservedObject private var visibility = ProviderVisibilityStore.shared
+    @ObservedObject private var connections = ProviderConnectionStore.shared
     @ObservedObject private var usageStore = UsageStore.shared
     @ObservedObject private var costStore = CostStore.shared
+    @ObservedObject private var currencyStore = CurrencyStore.shared
     @State private var liveStatusHovered = false
 
     var body: some View {
         VStack(spacing: 0) {
             LinearGradient(
-                colors: [.clear, .white.opacity(0.06), .white.opacity(0.06), .clear],
+                colors: [.clear, Color.primary.opacity(0.08), Color.primary.opacity(0.08), .clear],
                 startPoint: .leading, endPoint: .trailing
             )
             .frame(height: 1)
-            .padding(.horizontal, 22)
+            .padding(.horizontal, IslandPanelLayout.horizontalInset)
             .opacity(screenPref.screen == .overview ? 0 : 1)
 
             ZStack(alignment: .center) {
                 HStack(spacing: 10) {
+                    SettingsButton()
                     chip
 
                     if !activeStyleCycled {
@@ -43,7 +47,7 @@ struct PanelFooter: View {
                             Text(L10n.tr("click to cycle"))
                                 .font(Typography.label)
                         }
-                        .foregroundStyle(.white.opacity(0.42))
+                        .foregroundStyle(Color.primary.opacity(0.48))
                         .transition(.opacity.combined(with: .scale(scale: 0.92, anchor: .leading)))
                         .accessibilityElement(children: .combine)
                         .accessibilityLabel(cycleHintAccessibilityLabel)
@@ -60,10 +64,8 @@ struct PanelFooter: View {
                 // sit at true bottom-center of the panel.
                 PageIndicator(model: model)
             }
-            .frame(height: 24, alignment: .center)
-            .padding(.horizontal, 22)
-            .padding(.top, 6)
-            .padding(.bottom, 10)
+            .frame(height: IslandPanelLayout.footerHeight - 1, alignment: .center)
+            .padding(.horizontal, IslandPanelLayout.horizontalInset)
             .animation(.strongEaseOut, value: pref.hasCycledStyle)
             .animation(.strongEaseOut, value: costPref.hasCycledStyle)
             .animation(.strongEaseOut, value: screenPref.screen)
@@ -90,41 +92,62 @@ struct PanelFooter: View {
         let label: String = {
             switch screenPref.screen {
             case .usage: return pref.style.label.uppercased()
-            case .cost:  return costPref.style.label
+            case .cost:
+                return costPref.style == .dollar
+                    ? currencyStore.currency.rawValue
+                    : costPref.style.label
             case .overview: return currentYearString
             }
         }()
         Text(label)
             .font(Typography.chip)
             .tracking(0.8)
-            .foregroundStyle(.white.opacity(0.78))
+            .foregroundStyle(Color.primary.opacity(0.78))
             .padding(.horizontal, 6)
             .padding(.vertical, 2.5)
             .background(
                 RoundedRectangle(cornerRadius: 4)
-                    .fill(.white.opacity(0.08))
+                    .fill(Color.primary.opacity(0.08))
                     .overlay(
                         RoundedRectangle(cornerRadius: 4)
-                            .strokeBorder(.white.opacity(0.10), lineWidth: 0.5)
+                            .strokeBorder(Color.primary.opacity(0.12), lineWidth: 0.5)
                     )
             )
             .contentTransition(.opacity)
             .animation(.strongEaseOut, value: pref.style)
             .animation(.strongEaseOut, value: costPref.style)
+            .animation(.strongEaseOut, value: currencyStore.currency)
             .animation(.strongEaseOut, value: screenPref.screen)
     }
 
     private var activeLoading: Bool {
         switch screenPref.screen {
-        case .usage: return usageStore.loading
-        case .cost, .overview: return costStore.loading
+        case .usage: return usageStore.loading || visibility.selected.contains { connections.loading.contains($0) }
+        case .cost, .overview: return visibility.selected.contains { costStore.isLoading($0) }
         }
     }
 
     private var activeLastUpdated: Date? {
         switch screenPref.screen {
-        case .usage: return usageStore.lastUpdated
-        case .cost, .overview: return costStore.lastUpdated
+        case .usage:
+            let dates = visibility.selected.compactMap { provider in
+                provider.usesLegacyUsage ? usageStore.lastUpdated : connections.snapshot(provider).updatedAt
+            }
+            return dates.count == visibility.selected.count ? dates.min() : nil
+        case .cost, .overview:
+            let dates = visibility.selected.compactMap { costStore.updatedAt($0) }
+            return dates.count == visibility.selected.count ? dates.min() : nil
+        }
+    }
+
+    private var localNotice: String? {
+        guard screenPref.screen != .usage else { return nil }
+        return visibility.selected.compactMap { costStore.localNotices[$0] }.first
+    }
+
+    private var connectionNeedsAttention: Bool {
+        screenPref.screen == .usage && visibility.selected.contains {
+            !$0.usesLegacyUsage && connections.snapshot($0).updatedAt == nil
         }
     }
 
@@ -135,29 +158,35 @@ struct PanelFooter: View {
         // each store's refresh() prevent click-spam from stacking fetches.
         Button(action: triggerRefresh) {
             HStack(spacing: 6) {
-                LiveDot(active: activeLastUpdated != nil && !activeLoading)
+                LiveDot(active: activeLastUpdated != nil && !activeLoading && localNotice == nil)
                 if activeLoading {
                     Text(L10n.tr("Syncing…"))
                         .font(Typography.label)
-                        .foregroundStyle(.white.opacity(0.55))
+                        .foregroundStyle(Color.primary.opacity(0.55))
+                } else if localNotice != nil {
+                    Text("Check local records")
+                        .font(Typography.label).foregroundStyle(Color.primary.opacity(0.55))
+                } else if connectionNeedsAttention {
+                    Text(L10n.tr("Check connection"))
+                        .font(Typography.label).foregroundStyle(Color.primary.opacity(0.55))
                 } else if let updated = activeLastUpdated {
                     Text(L10n.tr("Synced"))
                         .font(Typography.label)
-                        .foregroundStyle(.white.opacity(liveStatusHovered ? 0.85 : 0.55))
+                        .foregroundStyle(Color.primary.opacity(liveStatusHovered ? 0.85 : 0.55))
                     Text(relative(updated))
                         .font(Typography.bodyNumber)
-                        .foregroundStyle(.white.opacity(liveStatusHovered ? 0.95 : 0.72))
+                        .foregroundStyle(Color.primary.opacity(liveStatusHovered ? 0.95 : 0.72))
                 } else {
                     Text(L10n.tr("Idle"))
                         .font(Typography.label)
-                        .foregroundStyle(.white.opacity(liveStatusHovered ? 0.7 : 0.4))
+                        .foregroundStyle(Color.primary.opacity(liveStatusHovered ? 0.70 : 0.40))
                 }
             }
             .padding(.horizontal, 6)
             .padding(.vertical, 3)
             .background(
                 RoundedRectangle(cornerRadius: 5)
-                    .fill(.white.opacity(liveStatusHovered && !activeLoading ? 0.05 : 0))
+                    .fill(Color.primary.opacity(liveStatusHovered && !activeLoading ? 0.05 : 0))
             )
             .contentShape(RoundedRectangle(cornerRadius: 5))
         }
@@ -171,7 +200,7 @@ struct PanelFooter: View {
                 NSCursor.pop()
             }
         }
-        .help(L10n.tr("Refresh now"))
+        .help(localNotice ?? L10n.tr("Refresh now"))
         .animation(.hoverFade, value: liveStatusHovered)
         .animation(.hoverFade, value: activeLoading)
         .accessibilityElement(children: .combine)
@@ -182,13 +211,19 @@ struct PanelFooter: View {
 
     private func triggerRefresh() {
         switch screenPref.screen {
-        case .usage: usageStore.refresh()
+        case .usage:
+            for provider in visibility.selected where !provider.usesLegacyUsage {
+                connections.refresh(provider, manually: true)
+            }
+            usageStore.refresh()
         case .cost, .overview: costStore.refresh()
         }
     }
 
     private var liveStatusSpoken: String {
         if activeLoading { return L10n.tr("Syncing") }
+        if let localNotice { return localNotice }
+        if connectionNeedsAttention { return L10n.tr("Check connection") }
         if let updated = activeLastUpdated { return L10n.tr("Synced %@", relative(updated)) }
         return L10n.tr("Idle")
     }

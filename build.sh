@@ -3,6 +3,13 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
+BUILD_LOCK="./.build.lock"
+if ! /usr/bin/shlock -p $$ -f "$BUILD_LOCK"; then
+  echo "error: another CodexIsland build is already running" >&2
+  exit 1
+fi
+trap 'rm -f "$BUILD_LOCK"' EXIT
+
 APP_NAME="CodexIsland"
 BUNDLE_ID="dev.codexisland.CodexIsland"
 VERSION="$(cat VERSION)"
@@ -33,12 +40,33 @@ SPARKLE_FW="$SPARKLE_DIR/Sparkle.framework"
 SU_PUBLIC_KEY="bz1gwLBKgIL/Y7OO23o3gaMNIeTpvv/C90F9inr9Quo="
 
 SU_FEED_URL="${SU_FEED_URL:-https://github.com/ericjypark/codex-island/releases/latest/download/appcast.xml}"
+ENABLE_UPDATES="${ENABLE_UPDATES:-0}"
+if [[ "$ENABLE_UPDATES" != "0" && "$ENABLE_UPDATES" != "1" ]]; then
+  echo "error: ENABLE_UPDATES must be 0 or 1" >&2
+  exit 1
+fi
+
+if [[ "$ENABLE_UPDATES" == "1" ]]; then
+  SPARKLE_PLIST_CONFIG="
+  <key>SUFeedURL</key><string>$SU_FEED_URL</string>
+  <key>SUPublicEDKey</key><string>$SU_PUBLIC_KEY</string>
+  <key>SUEnableAutomaticChecks</key><true/>"
+else
+  # A locally customized build must not install an official binary over itself.
+  # Upstream source updates are merged by scripts/sync-upstream.sh instead.
+  SPARKLE_PLIST_CONFIG="
+  <key>CodexIslandLocalBuild</key><true/>
+  <key>SUEnableAutomaticChecks</key><false/>"
+fi
 
 rm -rf "$BUILD_DIR"
 mkdir -p "$MACOS_DIR" "$RES_DIR" "$FRAMEWORKS_DIR"
 
 cp ./Resources/claude_logo.pdf "$RES_DIR/claude_logo.pdf"
 cp ./Resources/openai_logo.pdf "$RES_DIR/openai_logo.pdf"
+cp ./Resources/grok_logo.png "$RES_DIR/grok_logo.png"
+cp ./Resources/ThirdPartyNotices.txt "$RES_DIR/ThirdPartyNotices.txt"
+cp ./Resources/antigravity_logo.png "$RES_DIR/antigravity_logo.png"
 cp ./Resources/codexisland_logo.png "$RES_DIR/codexisland_logo.png"
 cp ./Resources/CodexIsland.icns "$RES_DIR/CodexIsland.icns"
 find ./Resources -maxdepth 1 -type d -name '*.lproj' -exec cp -R {} "$RES_DIR/" \;
@@ -92,9 +120,7 @@ cat > "$CONTENTS/Info.plist" <<EOF
   <key>NSHighResolutionCapable</key><true/>
   <key>NSPrincipalClass</key><string>NSApplication</string>
   <key>NSHumanReadableCopyright</key><string>Copyright © 2026 Eric Park. MIT licensed.</string>
-  <key>SUFeedURL</key><string>$SU_FEED_URL</string>
-  <key>SUPublicEDKey</key><string>$SU_PUBLIC_KEY</string>
-  <key>SUEnableAutomaticChecks</key><true/>
+$SPARKLE_PLIST_CONFIG
 </dict>
 </plist>
 EOF
@@ -111,10 +137,19 @@ XPC_DIR="$FRAMEWORKS_DIR/Sparkle.framework/Versions/Current/XPCServices"
 for xpc in Installer.xpc Downloader.xpc; do
   XPC_PATH="$XPC_DIR/$xpc"
   if [[ -d "$XPC_PATH" ]]; then
+    # File Provider may reattach FinderInfo to package directories after a
+    # recursive xattr pass, so clear every entry immediately before signing.
+    find "$XPC_PATH" -exec xattr -cs {} \;
     codesign --force --sign - --timestamp=none \
       --preserve-metadata=identifier,entitlements,flags "$XPC_PATH"
   fi
 done
+find "$FRAMEWORKS_DIR/Sparkle.framework" -exec xattr -cs {} \;
 codesign --force --sign - --timestamp=none "$FRAMEWORKS_DIR/Sparkle.framework"
+
+# File Provider can reattach FinderInfo while nested bundles are being signed,
+# so clear it once more after the last write. release.sh repeats this cleanup
+# immediately before distribution signing.
+xattr -cr "$APP_DIR"
 
 echo "✓ built $APP_DIR ($VERSION)"

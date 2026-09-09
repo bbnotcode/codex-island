@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 import Security
 
 /// Deep module owning Claude OAuth credential acquisition: the
@@ -59,6 +60,26 @@ enum ClaudeCredentials {
     /// no longer refresh.
     static func isTerminalAuthFailure(_ usage: AppUsage) -> Bool {
         isReauthActionable(usage.fiveHour.error) && isReauthActionable(usage.weekly.error)
+    }
+
+    /// True when BOTH windows carry specifically the expired-token error —
+    /// the one terminal failure a spawned CLI ping can fix. A refresh
+    /// re-issues the same scope set, so `reauthRequiredMessage` (missing
+    /// scope) needs a real `claude /login` instead and must never ping.
+    static func isExpiredTokenFailure(_ usage: AppUsage) -> Bool {
+        usage.fiveHour.error == tokenExpiredMessage
+            && usage.weekly.error == tokenExpiredMessage
+    }
+
+    /// Full gating for the refresh ping: the ping-fixable failure shape AND
+    /// not already attempted this expiry episode AND no re-auth flow owning
+    /// the store. Pure so the test harness can pin the billing-safety
+    /// invariant — a regression that respawned the ping every poll would
+    /// otherwise pass the suite silently.
+    static func shouldSpawnRefreshPing(
+        for usage: AppUsage, alreadyAttempted: Bool, reauthInProgress: Bool
+    ) -> Bool {
+        isExpiredTokenFailure(usage) && !alreadyAttempted && !reauthInProgress
     }
 
     /// Outcome of a single usage-endpoint probe against one token. The fetcher
@@ -262,9 +283,23 @@ enum ClaudeCredentials {
     /// Internal (not private) so ResolveUsageTests can point it at a fixture
     /// via CLAUDE_CONFIG_DIR and assert the decoded candidate.
     static func readClaudeFileCandidates() -> [KeychainCandidate] {
-        guard let data = FileManager.default.contents(atPath: claudeCredentialsFilePath()),
+        guard let data = readCredentialFile(atPath: claudeCredentialsFilePath()),
               let blob = decodeClaudeKeychainBlob(data) else { return [] }
         return [KeychainCandidate(account: NSUserName(), blob: blob)]
+    }
+
+    private static func readCredentialFile(atPath path: String) -> Data? {
+        let fm = FileManager.default
+        guard let attributes = try? fm.attributesOfItem(atPath: path),
+              attributes[.type] as? FileAttributeType == .typeRegular,
+              (attributes[.ownerAccountID] as? NSNumber)?.uint32Value == getuid(),
+              (attributes[.size] as? NSNumber)?.uint64Value ?? .max <= 1_048_576,
+              let values = try? URL(fileURLWithPath: path).resourceValues(
+                forKeys: [.isSymbolicLinkKey]
+              ),
+              values.isSymbolicLink != true
+        else { return nil }
+        return try? Data(contentsOf: URL(fileURLWithPath: path), options: .mappedIfSafe)
     }
 
     /// First candidate carrying a usable `claudeAiOauth` (non-empty access
@@ -502,6 +537,69 @@ enum ClaudeCredentials {
             return true
         } catch {
             NSLog("CodexIsland: failed to spawn claude auth login: %@", error.localizedDescription)
+            return false
+        }
+    }
+
+    /// Detached `claude -p` ping run only for its side effect: the CLI
+    /// refreshes an expired access token before answering and writes the
+    /// rotated pair back to its credential store, which the credential-store
+    /// watch then picks up within seconds. The app itself stays strictly
+    /// read-only against the token family — the CLI remains the single
+    /// legitimate refresher; this just makes "run claude" happen without the
+    /// user. Needed because desktop-app Claude Code injects its own
+    /// host-refreshed CLAUDE_CODE_OAUTH_TOKEN and never maintains the CLI
+    /// store, so on desktop-only days the keychain token dies ~8h after the
+    /// last terminal run and stays dead.
+    ///
+    /// Cost + safety bounds: haiku model, `--strict-mcp-config` with no
+    /// config (zero MCP servers spawned), no tool grants, cwd pinned to
+    /// $HOME, stdio detached. Reaches only subscription-OAuth logins by
+    /// construction — the expired-token failure only arises from
+    /// `claudeAiOauth` candidates, so console/API-key users can never be
+    /// billed by it.
+    @discardableResult
+    static func spawnTokenRefreshPing() -> Bool {
+        guard let path = locateClaudeBinary() else { return false }
+        let inheritedEnvironment = ProcessInfo.processInfo.environment
+        let alternativeBackendKeys = [
+            "CLAUDE_CODE_USE_BEDROCK",
+            "CLAUDE_CODE_USE_VERTEX",
+            "CLAUDE_CODE_USE_FOUNDRY",
+            "ANTHROPIC_BASE_URL",
+            "ANTHROPIC_BEDROCK_BASE_URL",
+        ]
+        guard !alternativeBackendKeys.contains(where: {
+            !(inheritedEnvironment[$0] ?? "").isEmpty
+        }) else {
+            NSLog("CodexIsland: skipped claude token-refresh ping because an alternate backend is configured")
+            return false
+        }
+        let task = Process()
+        task.launchPath = path
+        task.arguments = ["-p", "ok", "--model", "haiku", "--strict-mcp-config"]
+        task.currentDirectoryPath = NSHomeDirectory()
+        // Deterministic auth path: the ping exists to refresh the KEYCHAIN
+        // login and must never bill anything. Drop the env overrides that
+        // would route the CLI to API-key billing or to an injected token
+        // that bypasses the keychain writeback (app launched from a shell
+        // that exports them).
+        var env = inheritedEnvironment
+        for key in ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN"] {
+            env.removeValue(forKey: key)
+        }
+        task.environment = env
+        // Null device, not pipes: a pipe nobody drains wedges a chatty child
+        // forever at the 64KB buffer and the Process self-retains — the null
+        // device can't block, so no lingering process to leak.
+        task.standardOutput = FileHandle.nullDevice
+        task.standardError = FileHandle.nullDevice
+        task.standardInput = FileHandle.nullDevice
+        do {
+            try task.run()
+            return true
+        } catch {
+            NSLog("CodexIsland: failed to spawn claude token-refresh ping: %@", error.localizedDescription)
             return false
         }
     }

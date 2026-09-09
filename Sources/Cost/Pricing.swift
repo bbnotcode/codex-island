@@ -184,7 +184,7 @@ enum Pricing {
     /// Claude Code workflows. ccusage's per-bucket threshold check would
     /// disagree with Anthropic's per-position-in-context billing anyway.
     static func cost(for event: TokenEvent) -> Double {
-        guard let rates = resolvedRates(for: canonicalModel(event.model)) else { return 0 }
+        guard let rates = resolvedRates(for: canonicalModel(event.model), at: event.timestamp) else { return 0 }
 
         let input = Double(event.inputTokens) / 1_000_000 * rates.inputPerMillion
         let output = Double(event.outputTokens) / 1_000_000 * rates.outputPerMillion
@@ -203,7 +203,14 @@ enum Pricing {
 
     /// Remote catalog first, embedded seed second. The seed is what keeps a
     /// catalog that omits a model from silently pricing it at $0.
-    private static func resolvedRates(for canonical: String) -> Rates? {
+    private static func resolvedRates(for canonical: String, at date: Date = Date()) -> Rates? {
+        // Published Gemini introductory pricing expires on 2027-01-01 UTC.
+        // Use event time so importing older CLI records keeps their historical rate.
+        if ["gemini-3.6-flash", "gemini-3.7-flash", "gemini-3.8-flash"].contains(canonical) {
+            let factor = date.timeIntervalSince1970 < 1_798_761_600 ? 1.0 : 2.0
+            return Rates(inputPerMillion: 0.75 * factor, outputPerMillion: 3.75 * factor,
+                         cacheCreationPerMillion: 0.75 * factor, cacheReadPerMillion: 0.075 * factor)
+        }
         if let remote = PricingCatalog.rates(for: canonical) {
             return Rates(
                 inputPerMillion: remote.inputPerMillion,
@@ -258,6 +265,8 @@ enum Pricing {
     }
 
     private static func canonicalModel(_ raw: String) -> String {
+        let raw = raw.hasPrefix("claude-") && raw.hasSuffix("-thinking")
+            ? String(raw.dropLast("-thinking".count)) : raw
         guard raw.count > 9 else { return raw }
         let suffixStart = raw.index(raw.endIndex, offsetBy: -9)
         let suffix = raw[suffixStart...]

@@ -20,8 +20,11 @@ struct SettingsView: View {
     @ObservedObject private var usageDisplay = UsageDisplayModeStore.shared
     @ObservedObject private var targetDisplay = IslandTargetDisplayStore.shared
     @ObservedObject private var appLanguage = AppLanguageStore.shared
+    @ObservedObject private var appearanceStore = AppearanceStore.shared
+    @ObservedObject private var codexTaskStatus = CodexTaskStatusStore.shared
     @ObservedObject private var usage = UsageStore.shared
     @ObservedObject private var cost = CostStore.shared
+    @ObservedObject private var currencyStore = CurrencyStore.shared
     @ObservedObject private var updater = UpdaterController.shared
 
     @AppStorage("Settings.activeTab") private var activeTabRaw: String = SettingsTab.general.rawValue
@@ -66,9 +69,9 @@ struct SettingsView: View {
 
             SettingsFooter()
         }
-        .frame(minWidth: 440, minHeight: 420)
-        .background(Color(red: 0.020, green: 0.020, blue: 0.027))
-        .preferredColorScheme(.dark)
+        .frame(minWidth: 440, minHeight: 560)
+        .background(IslandColor.settingsBackground)
+        .preferredColorScheme(appearanceStore.appearance.colorScheme)
     }
 
     // MARK: - Tabs
@@ -105,16 +108,16 @@ struct SettingsView: View {
             Text(L10n.tr(tab.label))
                 .font(Typography.tabLabel)
                 .foregroundStyle(isOn
-                    ? .white.opacity(0.95)
-                    : .white.opacity(0.50))
+                    ? Color.primary.opacity(0.95)
+                    : Color.primary.opacity(0.50))
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
                 .background {
                     RoundedRectangle(cornerRadius: 6)
-                        .fill(isOn ? .white.opacity(0.08) : .clear)
+                        .fill(isOn ? Color.primary.opacity(0.08) : .clear)
                         .overlay {
                             RoundedRectangle(cornerRadius: 6)
-                                .strokeBorder(.white.opacity(isOn ? 0.08 : 0), lineWidth: 0.5)
+                                .strokeBorder(Color.primary.opacity(isOn ? 0.08 : 0), lineWidth: 0.5)
                         }
                 }
         }
@@ -166,7 +169,7 @@ struct SettingsView: View {
 
     private var hairline: some View {
         LinearGradient(
-            colors: [.clear, .white.opacity(0.055), .white.opacity(0.055), .clear],
+            colors: [.clear, Color.primary.opacity(0.055), Color.primary.opacity(0.055), .clear],
             startPoint: .leading, endPoint: .trailing
         )
         .frame(height: 1)
@@ -179,12 +182,12 @@ struct SettingsView: View {
                 .font(Typography.sectionLabel)
                 .tracking(1.05)
                 .textCase(.uppercase)
-                .foregroundStyle(.white.opacity(0.34))
+                .foregroundStyle(Color.primary.opacity(0.34))
             Spacer(minLength: 8)
             if let hint {
                 Text(L10n.tr(hint))
                     .font(Typography.micro)
-                    .foregroundStyle(.white.opacity(0.18))
+                    .foregroundStyle(Color.primary.opacity(0.18))
             }
         }
         .padding(.horizontal, 10)
@@ -213,6 +216,12 @@ struct SettingsView: View {
                 subtitle: appLanguage.language.subtitle
             ) {
                 languagePicker
+            }
+            SettingsRow(
+                title: "Appearance",
+                subtitle: "Choose a light or dark skin, or follow macOS."
+            ) {
+                appearanceSegmented
             }
             SettingsRow(
                 title: "Always show usage",
@@ -245,7 +254,7 @@ struct SettingsView: View {
             sectionLabel("Alerts")
             SettingsRow(
                 title: "Approaching-limit alerts",
-                subtitle: "Tint the island and pulse the peek pill when 5-hour usage nears your limit."
+                subtitle: "Tint the island and pulse the peek pill when usage nears your active limit."
             ) {
                 SettingsToggle(isOn: alertPrefs.enabled) {
                     // withAnimation here so the threshold rows + Preview row
@@ -296,17 +305,17 @@ struct SettingsView: View {
         Button(action: action) {
             Text(L10n.tr(label))
                 .font(Typography.bodyNumber)
-                .foregroundStyle(.white.opacity(0.85))
+                .foregroundStyle(Color.primary.opacity(0.85))
                 .lineLimit(1)
                 .fixedSize()
                 .padding(.horizontal, 9)
                 .padding(.vertical, 4)
                 .background {
                     RoundedRectangle(cornerRadius: 5)
-                        .fill(.white.opacity(0.06))
+                        .fill(Color.primary.opacity(0.06))
                         .overlay {
                             RoundedRectangle(cornerRadius: 5)
-                                .strokeBorder(.white.opacity(0.10), lineWidth: 0.5)
+                                .strokeBorder(Color.primary.opacity(0.10), lineWidth: 0.5)
                         }
                 }
         }
@@ -371,7 +380,7 @@ struct SettingsView: View {
             Text(L10n.tr(label))
                 .font(Typography.rowTitle)
                 .tracking(-0.07)
-                .foregroundStyle(.white.opacity(0.92))
+                .foregroundStyle(Color.primary.opacity(0.92))
             Spacer(minLength: 8)
             thresholdStepper(value: value, range: range)
         }
@@ -412,21 +421,21 @@ struct SettingsView: View {
                 .textFieldStyle(.plain)
                 .multilineTextAlignment(.center)
                 .font(Typography.bodyNumber)
-                .foregroundStyle(.white.opacity(0.95))
+                .foregroundStyle(Color.primary.opacity(0.95))
                 .monospacedDigit()
                 .frame(width: 22, height: 18)
                 .clipped()
             Text("%")
                 .font(Typography.bodyNumber)
-                .foregroundStyle(.white.opacity(0.55))
+                .foregroundStyle(Color.primary.opacity(0.55))
         }
         .frame(width: 64, height: 28)
         .background {
             RoundedRectangle(cornerRadius: 7)
-                .fill(.white.opacity(0.05))
+                .fill(Color.primary.opacity(0.05))
                 .overlay {
                     RoundedRectangle(cornerRadius: 7)
-                        .strokeBorder(.white.opacity(0.10), lineWidth: 0.5)
+                        .strokeBorder(Color.primary.opacity(0.10), lineWidth: 0.5)
                 }
         }
     }
@@ -434,24 +443,53 @@ struct SettingsView: View {
     private var updatesSection: some View {
         VStack(alignment: .leading, spacing: 0) {
             sectionLabel("Updates")
-            SettingsRow(
-                title: "Check for updates automatically",
-                subtitle: "Check for new versions in the background and notify you when one's available."
-            ) {
-                SettingsToggle(isOn: updater.automaticallyChecks) {
-                    updater.automaticallyChecks.toggle()
+            if updater.updatesEnabled {
+                SettingsRow(
+                    title: "Check for updates automatically",
+                    subtitle: "Check for new versions in the background and notify you when one's available."
+                ) {
+                    SettingsToggle(isOn: updater.automaticallyChecks) {
+                        updater.automaticallyChecks.toggle()
+                    }
                 }
-            }
-            SettingsRow(
-                title: "Check now",
-                subtitle: "Look for a new version immediately."
-            ) {
-                PillButton(label: "Check") { updater.checkForUpdates() }
+                SettingsRow(
+                    title: "Check now",
+                    subtitle: "Look for a new version immediately."
+                ) {
+                    PillButton(label: "Check") { updater.checkForUpdates() }
+                }
+            } else {
+                SettingsRow(
+                    title: "Local customization build",
+                    subtitle: localUpdateSubtitle
+                ) {
+                    if case .available = updater.localUpdateState {
+                        PillButton(label: "Safe sync") { updater.openLocalSyncTool() }
+                    } else {
+                        PillButton(
+                            label: updater.localUpdateState == .checking ? "Checking…" : "Check",
+                            isLoading: updater.localUpdateState == .checking
+                        ) { updater.checkForUpdates() }
+                    }
+                }
             }
         }
         .padding(.horizontal, 14)
         .padding(.top, 14)
         .padding(.bottom, 6)
+    }
+
+    private var localUpdateSubtitle: String {
+        switch updater.localUpdateState {
+        case .idle, .checking:
+            return L10n.tr("Checking the latest GitHub release without replacing local features.")
+        case .current(let version):
+            return L10n.tr("Version %@ is current. Local features remain protected.", version)
+        case .available(let version):
+            return L10n.tr("Version %@ is available. Safe sync preserves local features and rebuilds the app.", version)
+        case .failed:
+            return L10n.tr("Could not check GitHub. Try again when the network is available.")
+        }
     }
 
     private var languagePicker: some View {
@@ -464,6 +502,15 @@ struct SettingsView: View {
         .pickerStyle(.menu)
         .fixedSize()
         .accessibilityLabel(L10n.tr("Language"))
+    }
+
+    private var appearanceSegmented: some View {
+        SegmentedControl(
+            items: AppAppearance.allCases,
+            selected: $appearanceStore.appearance,
+            label: \.label,
+            accessibilityPrefix: "Appearance"
+        )
     }
 
     private var languageSelection: Binding<AppLanguage> {
@@ -490,34 +537,52 @@ struct SettingsView: View {
 
     private var providersSection: some View {
         VStack(alignment: .leading, spacing: 0) {
-            sectionLabel("Providers")
+            ProviderSelectionView()
+            hairline
+            sectionLabel("Codex task status")
             SettingsRow(
-                title: "Claude",
-                subtitle: providerSubtitle(usage.claude),
-                dot: IslandColor.claude,
-                chip: usage.claude.plan?.uppercased()
+                title: "Codex task status",
+                subtitle: "Show local Codex task state in the empty side when one provider is selected."
             ) {
-                SettingsToggle(isOn: visibility.claudeVisible) {
-                    withAnimation(.openMorph) {
-                        visibility.claudeVisible.toggle()
-                    }
+                SettingsToggle(isOn: codexTaskStatus.enabled) {
+                    codexTaskStatus.enabled.toggle()
                 }
             }
             SettingsRow(
-                title: "Codex",
-                subtitle: providerSubtitle(usage.codex),
-                dot: IslandColor.codex,
-                chip: usage.codex.plan?.uppercased()
+                title: "Status display",
+                subtitle: "Choose an icon only or include a localized label."
             ) {
-                SettingsToggle(isOn: visibility.codexVisible) {
-                    withAnimation(.openMorph) {
-                        visibility.codexVisible.toggle()
-                    }
+                SegmentedControl(
+                    items: CodexTaskStatusStore.DisplayMode.allCases,
+                    selected: $codexTaskStatus.displayMode,
+                    label: \.label,
+                    accessibilityPrefix: "Status display"
+                )
+            }
+            .disabled(!codexTaskStatus.enabled)
+            .opacity(codexTaskStatus.enabled ? 1 : 0.4)
+            SettingsRow(
+                title: "Status sounds",
+                subtitle: "Use distinct sounds for each state and repeat pending approval reminders up to twice."
+            ) {
+                SettingsToggle(isOn: codexTaskStatus.soundEnabled) {
+                    codexTaskStatus.soundEnabled.toggle()
                 }
             }
+            .disabled(!codexTaskStatus.enabled)
+            .opacity(codexTaskStatus.enabled ? 1 : 0.4)
+            SettingsRow(
+                title: "Completion confetti",
+                subtitle: "Trigger Raycast confetti when a top-level task completes successfully."
+            ) {
+                SettingsToggle(isOn: codexTaskStatus.confettiEnabled) {
+                    codexTaskStatus.confettiEnabled.toggle()
+                }
+            }
+            .disabled(!codexTaskStatus.enabled)
+            .opacity(codexTaskStatus.enabled ? 1 : 0.4)
         }
         .padding(.horizontal, 14)
-        .padding(.top, 18)
         .padding(.bottom, 6)
     }
 
@@ -560,29 +625,51 @@ struct SettingsView: View {
         )
     }
 
-    /// Single-row Cost section. Re-uses the section-label typography on the
-    /// left and inlines the freshness caption + refresh button on the right
-    /// — compact so it sits cleanly under the Providers list.
+    /// Compact Cost section with the rate attribution kept under the
+    /// freshness caption, so the currency picker remains usable in the
+    /// settings window's narrowest supported width.
     private var costSection: some View {
         HStack(alignment: .center, spacing: 10) {
             Text(L10n.tr("Cost"))
                 .font(Typography.sectionLabel)
                 .tracking(1.05)
                 .textCase(.uppercase)
-                .foregroundStyle(.white.opacity(0.34))
+                .foregroundStyle(Color.primary.opacity(0.34))
 
-            Text(costSubtitle())
-                .font(Typography.label)
-                .foregroundStyle(.white.opacity(0.42))
-                .lineLimit(1)
-                .truncationMode(.tail)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(costSubtitle())
+                    .font(Typography.label)
+                    .foregroundStyle(Color.primary.opacity(0.42))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+
+                Link(
+                    L10n.tr("Rates by ExchangeRate-API"),
+                    destination: URL(string: "https://www.exchangerate-api.com")!
+                )
+                .font(Typography.micro)
+                .foregroundStyle(Color.primary.opacity(0.34))
+            }
 
             Spacer(minLength: 8)
 
+            Picker("", selection: $currencyStore.currency) {
+                ForEach(DisplayCurrency.allCases) { currency in
+                    Text(currency.menuLabel).tag(currency)
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
+            .fixedSize()
+            .accessibilityLabel(L10n.tr("Display currency"))
+
             PillButton(
-                label: cost.loading ? "Refreshing…" : "Refresh",
-                isLoading: cost.loading
-            ) { cost.refresh() }
+                label: cost.loading || currencyStore.refreshing ? "Refreshing…" : "Refresh",
+                isLoading: cost.loading || currencyStore.refreshing
+            ) {
+                cost.refresh()
+                currencyStore.refresh()
+            }
         }
         .padding(.horizontal, 24)
         .padding(.top, 14)
@@ -597,12 +684,18 @@ struct SettingsView: View {
     }()
 
     private func costSubtitle() -> String {
+        if currencyStore.refreshing {
+            return L10n.tr("updating exchange rate…")
+        }
         if cost.loading {
             return L10n.tr("scanning local logs…")
         }
         if let updated = cost.lastUpdated {
             let relative = Self.relativeFormatter.localizedString(for: updated, relativeTo: Date())
-            return L10n.tr("last scan %@", relative)
+            if currencyStore.currency == .usd {
+                return L10n.tr("last scan %@", relative)
+            }
+            return L10n.tr("last scan %@ · estimated %@", relative, currencyStore.currency.rawValue)
         }
         return L10n.tr("swipe panel to view")
     }
@@ -770,6 +863,9 @@ struct SettingsView: View {
     }
 
     private func windowCaption(_ w: WindowUsage) -> String {
+        // The parse-omission sentinel is a plan shape, not a fault — no
+        // warning glyph for a window the provider doesn't offer.
+        if w.isUnreported { return "—" }
         if let err = w.error, w.percentInt == 0 { return "⚠ \(err)" }
         return "\(w.displayedPercentInt(mode: usageDisplay.mode))%"
     }

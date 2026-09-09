@@ -4,6 +4,75 @@ User-facing changes per release. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); dates are when the
 tag was cut.
 
+## [0.2.1] - 2026-09-08
+
+See every supported provider's activity in one calendar, then click a provider
+in the legend to filter its history—even when it is not selected for the usage pills.
+
+### Changed
+
+- Overview combines local history from all supported providers and adds provider filters.
+- Page transitions use Core Animation, with display-aware frame pacing and a
+  30 FPS request in Low Power Mode. History preparation avoids repeated work
+  during interaction updates.
+- Antigravity has a distinct lilac color, and Settings opens with more vertical space.
+
+### Fixed
+
+- Expired Grok and Antigravity sessions get one renewal attempt through the
+  official CLI before retrying. HTTP 403 no longer implies that the user is logged out.
+- Accounts without reported usage show actionable empty states; existing cost
+  records and real zero-percent readings remain visible.
+
+## [0.1.23] - 2026-08-14
+
+Weekly-only Codex plans get a real number in the peek pill instead of "—%".
+
+### Fixed
+
+- **The peek pill works on weekly-only Codex plans.** Plans that report
+  only a weekly quota (no 5-hour window) always showed "—%" on hover —
+  the pill was hard-wired to the missing 5-hour slot. It now falls back
+  to the weekly window: the remaining percentage and its multi-day
+  countdown ("34% · 6d 23h") render, VoiceOver announces it as the
+  weekly window, and the no-countdown fallback glyph reads "7d" instead
+  of "5h". Two-window plans still show the 5-hour window first.
+  Contributed by @albertloky (#75).
+- **Limit alerts follow the window you can see.** Alert severity (the
+  warning glyph and amber/red tint) tracked the 5-hour window even when
+  the peek was showing the weekly one — a weekly-only plan at 96% never
+  warned. Severity now tracks the same window the pill displays.
+
+## [0.1.22] - 2026-08-10
+
+Waking your Mac no longer strands the Claude card on "rate limited" or
+"token expired — run claude", and the Codex week tile is alive again.
+
+### Fixed
+
+- **Post-wake false alarms self-heal now.** Opening the lid used to fire
+  the first poll straight into a half-up network with an access token
+  that had expired mid-sleep — the panel then sat on an error caption
+  for up to 45 minutes even though Claude itself worked fine. The app
+  now waits out the wake burst before its first probe, watches the
+  credential store for Claude Code's own token refresh and refetches
+  within seconds (metadata only — never a keychain prompt), nudges the
+  CLI with one silent haiku ping per expiry episode on days when
+  nothing else refreshes the login (desktop-app-only workflows), and
+  repaints the last real readings under the failure caption instead of
+  blanking to "—" while a rate-limit cooldown runs its course.
+- **The Codex week tile had been dead since mid-July.** The usage API
+  stopped assigning window slots by position: single-limit plans now
+  ship their weekly window in the primary slot, which landed the weekly
+  percentage in the 5h tile (complete with a "resets in 3d" countdown)
+  and left the week tile at "—" forever. Windows are now routed by
+  their advertised span, with the old slot-order behavior kept for
+  accounts still on the two-window shape.
+- **No more fabricated percentages.** A window the plan doesn't report
+  shows a passive "—" everywhere now — the peek pill used to render it
+  as "0% · 5h" (a full budget under the remaining toggle) and Settings
+  flagged it "⚠ no data" as if something were broken.
+
 ## [0.1.21] - 2026-07-26
 
 Model prices now come from a published catalog instead of the app binary,

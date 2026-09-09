@@ -25,10 +25,7 @@ final class AlertEngine: ObservableObject {
         }
     }
 
-    enum Provider: String, Hashable {
-        case claude
-        case codex
-    }
+    typealias Provider = IslandProvider
 
     enum Threshold: Int, Hashable {
         case warning, critical
@@ -49,6 +46,7 @@ final class AlertEngine: ObservableObject {
     /// Highest severity across visible 5h windows currently at/above their
     /// respective threshold. Drives the silhouette glow color.
     @Published private(set) var severity: Severity = .none
+    @Published private(set) var providerSeverities: [Provider: Severity] = [:]
 
     /// One-shot pulse event. UI sets back to `nil` after consuming.
     @Published var pulseEvent: PulseEvent?
@@ -81,6 +79,8 @@ final class AlertEngine: ObservableObject {
         let triggers: [AnyPublisher<Void, Never>] = [
             UsageStore.shared.$claude.map { _ in () }.eraseToAnyPublisher(),
             UsageStore.shared.$codex.map { _ in () }.eraseToAnyPublisher(),
+            ProviderConnectionStore.shared.objectWillChange.map { _ in () }.eraseToAnyPublisher(),
+            ProviderQuotaPreferences.shared.objectWillChange.map { _ in () }.eraseToAnyPublisher(),
             AlertThresholdStore.shared.objectWillChange.map { _ in () }.eraseToAnyPublisher(),
             ProviderVisibilityStore.shared.objectWillChange.map { _ in () }.eraseToAnyPublisher(),
         ]
@@ -119,9 +119,16 @@ final class AlertEngine: ObservableObject {
             AlertDecision.WindowInput(
                 provider: .codex,
                 visible: visibility.codexVisible,
-                window: usage.codex.fiveHour
+                // peekWindow, not fiveHour: weekly-only Codex plans report no
+                // 5h window, and severity must track the same number the peek
+                // pill and silhouette tint surface. Two-window plans still
+                // alert on 5h (peekWindow prefers it).
+                window: usage.codex.peekWindow
             ),
-        ]
+        ] + [IslandProvider.grok, .antigravity].map { provider in
+            AlertDecision.WindowInput(provider: provider, visible: visibility.selected.contains(provider),
+                window: ProviderConnectionStore.shared.primary(provider)?.window ?? .unknown)
+        }
 
         // Severity drives the silhouette tint and is always computed: a
         // user launching at 96% should see red immediately, even before
@@ -136,7 +143,8 @@ final class AlertEngine: ObservableObject {
 
         let claudeSev = perWindowSeverity[.claude] ?? .none
         let codexSev = perWindowSeverity[.codex] ?? .none
-        let combined = max(claudeSev, codexSev)
+        let combined = perWindowSeverity.values.max() ?? .none
+        if perWindowSeverity != providerSeverities { providerSeverities = perWindowSeverity }
 
         if claudeSev != self.claudeSeverity { self.claudeSeverity = claudeSev }
         if codexSev != self.codexSeverity { self.codexSeverity = codexSev }
@@ -320,4 +328,3 @@ enum AlertDecision {
         return CrossingsEvalResult(next: next, pulse: pulse)
     }
 }
-

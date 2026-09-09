@@ -46,8 +46,15 @@ final class IslandHostingView: NSHostingView<IslandRootView> {
     /// swallowed to activate/focus the window, the second click triggers the
     /// actual gesture. With our overlay model, the user is hovering over the
     /// notch from a different focused app (Terminal, Xcode) and expects the
-    /// first click to expand the panel — not just bring the window to focus.
+    /// first right-click to expand the panel — not just bring the window to
+    /// focus.
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    /// Right-click is the deliberate pointer gesture for opening the full
+    /// dashboard. Forward it to SwiftUI without showing a context menu.
+    override func rightMouseDown(with event: NSEvent) {
+        NotificationCenter.default.post(name: .islandRightClickRequested, object: nil)
+    }
 
     /// Two-finger trackpad swipe → page change. Only fires when the panel is
     /// expanded and the gesture is horizontal-dominant. Uses
@@ -131,4 +138,8 @@ final class IslandHostingView: NSHostingView<IslandRootView> {
 
         return false
     }
+}
+
+extension Notification.Name {
+    static let islandRightClickRequested = Notification.Name("IslandRightClickRequested")
 }
