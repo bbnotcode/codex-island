@@ -38,7 +38,7 @@ struct CostStylePicker: View {
                 Text(currencyStore.displaySymbol)
                     .font(Typography.micro)
                     .foregroundStyle(.white.opacity(0.5))
-                Text("87")
+                Text(currencyStore.formatted(usd: 87, includesSymbol: false))
                     .font(Typography.previewNumber)
                     .foregroundStyle(claude)
             }

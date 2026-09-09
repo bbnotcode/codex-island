@@ -192,7 +192,10 @@ runs as an accessory app with no Dock icon and no menu bar.
   manual refresh for local cost data. Cost estimates can be displayed in USD,
   CNY, EUR, GBP, JPY, KRW, CAD, AUD, or CHF. Conversion uses a cached daily
   reference rate; the underlying model prices and cost calculations remain in
-  USD.
+  USD. Like model pricing, exchange rates load from cache at startup and are
+  checked every six hours, fetching when at least 24 hours old. Refresh also
+  updates exchange rates. Currency selection uses the shared cached table;
+  offline, the last valid table is retained (or USD is shown until one is available).
 
 Preferences are stored in `UserDefaults` under `MacIsland.*` keys (Sparkle
 manages its own `SU*` update keys, and Launch at Login uses

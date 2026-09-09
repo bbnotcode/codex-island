@@ -115,7 +115,7 @@ struct PanelFooter: View {
             .contentTransition(.opacity)
             .animation(.strongEaseOut, value: pref.style)
             .animation(.strongEaseOut, value: costPref.style)
-            .animation(.strongEaseOut, value: currencyStore.currency)
+            .animation(.strongEaseOut, value: currencyStore.displayCurrency)
             .animation(.strongEaseOut, value: screenPref.screen)
     }
 

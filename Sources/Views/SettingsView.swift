@@ -604,7 +604,10 @@ struct SettingsView: View {
             PillButton(
                 label: cost.loading ? "Refreshing…" : "Refresh",
                 isLoading: cost.loading
-            ) { cost.refresh() }
+            ) {
+                cost.refresh()
+                currencyStore.refresh()
+            }
         }
         .padding(.horizontal, 24)
         .padding(.top, 14)
