@@ -4,6 +4,24 @@ User-facing changes per release. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); dates are when the
 tag was cut.
 
+## [0.2.2] - 2026-09-08
+
+View estimated token costs in your preferred currency, with nine display
+currencies and cached daily exchange rates.
+
+### Added
+
+- Choose USD, CNY, EUR, GBP, JPY, KRW, CAD, AUD, or CHF in Settings → Providers.
+  Cost totals, value comparisons, and model breakdowns use the selected currency;
+  underlying model prices stay in USD. Offline, the last valid exchange rates
+  are retained, with a clearly labeled USD fallback before rates are available.
+
+### Fixed
+
+- The expanded panel fits the selected page's content, including calendar day
+  details, and settles at the correct height after rapid navigation during opening.
+- The entire Usage display row in provider settings now opens its controls.
+
 ## [0.2.1] - 2026-09-08
 
 See every supported provider's activity in one calendar, then click a provider
