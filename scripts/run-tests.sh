@@ -10,6 +10,13 @@ cd "$(dirname "$0")/.."
 OUT_DIR=$(mktemp -d)
 trap 'rm -rf "$OUT_DIR"' EXIT
 
+swiftc -parse-as-library -o "$OUT_DIR/currency-tests" \
+  Sources/Model/CurrencyStore.swift \
+  Sources/Model/AppLanguageStore.swift \
+  Sources/Localization/L10n.swift \
+  Tests/CurrencyStoreTests.swift
+"$OUT_DIR/currency-tests"
+
 swiftc \
   -parse-as-library \
   -o "$OUT_DIR/resolve-usage-tests" \

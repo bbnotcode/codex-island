@@ -12,7 +12,9 @@ struct CostStylePicker: View {
         HStack(spacing: 6) {
             ForEach(CostStyle.allCases, id: \.self) { style in
                 StyleTile(
-                    displayLabel: style == .dollar ? currencyStore.currency.rawValue : style.label,
+                    displayLabel: style == .dollar
+                        ? currencyStore.displayCurrency.rawValue
+                        : style.label,
                     isOn: style == selected,
                     action: {
                         selected = style
@@ -36,7 +38,7 @@ struct CostStylePicker: View {
                 Text(currencyStore.displaySymbol)
                     .font(Typography.micro)
                     .foregroundStyle(Color.primary.opacity(0.5))
-                Text("87")
+                Text(currencyStore.formatted(usd: 87, includesSymbol: false))
                     .font(Typography.previewNumber)
                     .foregroundStyle(claude)
             }

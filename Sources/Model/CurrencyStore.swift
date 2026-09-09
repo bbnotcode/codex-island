@@ -36,11 +36,11 @@ final class CurrencyStore: ObservableObject {
     static let shared = CurrencyStore()
 
     private static let selectionKey = "MacIsland.displayCurrency"
-    private static let cacheKey = "MacIsland.currencyRates.v1"
+    private static let cacheKey = "MacIsland.currencyRates.v2"
     private static let refreshInterval: TimeInterval = 24 * 60 * 60
 
-    private struct CachedRate: Codable {
-        let rate: Double
+    private struct CachedRates: Codable {
+        let rates: [String: Double]
         let fetchedAt: Date
         let sourceDate: String
     }
@@ -60,50 +60,49 @@ final class CurrencyStore: ObservableObject {
 
     @Published var currency: DisplayCurrency {
         didSet {
-            UserDefaults.standard.set(currency.rawValue, forKey: Self.selectionKey)
-            applyCachedRate()
-            refreshTask?.cancel()
-            let requestedCurrency = currency
-            refreshTask = Task {
-                await refreshIfNeeded(force: true, for: requestedCurrency)
-            }
+            defaults.set(currency.rawValue, forKey: Self.selectionKey)
         }
     }
 
-    @Published private(set) var usdRate: Double = 1
-    @Published private(set) var lastUpdated: Date?
+    var usdRate: Double { cache?.rates[currency.rawValue] ?? 1 }
+    var lastUpdated: Date? { cache?.fetchedAt }
     @Published private(set) var refreshing = false
 
-    private var cache: [String: CachedRate]
-    private var refreshTask: Task<Void, Never>?
+    @Published private var cache: CachedRates?
+    private let defaults: UserDefaults
+    private var refreshTimer: Timer?
 
-    private init() {
-        currency = Pref.enumValue(key: Self.selectionKey, default: DisplayCurrency.usd)
-        if let data = UserDefaults.standard.data(forKey: Self.cacheKey),
-           let decoded = try? JSONDecoder().decode([String: CachedRate].self, from: data) {
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        currency = defaults.string(forKey: Self.selectionKey)
+            .flatMap(DisplayCurrency.init(rawValue:)) ?? .usd
+        if let data = defaults.data(forKey: Self.cacheKey),
+           let decoded = try? JSONDecoder().decode(CachedRates.self, from: data),
+           Self.validRates(decoded.rates) {
             cache = decoded
         } else {
-            cache = [:]
+            cache = nil
         }
-        applyCachedRate()
-        let initialCurrency = currency
-        refreshTask = Task { await refreshIfNeeded(for: initialCurrency) }
     }
 
     func converted(usd: Double) -> Double {
         usd * usdRate
     }
 
+    var displayCurrency: DisplayCurrency {
+        hasUsableRate ? currency : .usd
+    }
+
     var displaySymbol: String {
-        hasUsableRate ? currency.symbol : DisplayCurrency.usd.symbol
+        displayCurrency.symbol
     }
 
     var displayUsesWholeUnits: Bool {
-        hasUsableRate ? currency.usesWholeUnits : false
+        displayCurrency.usesWholeUnits
     }
 
     private var hasUsableRate: Bool {
-        currency == .usd || cache[currency.rawValue] != nil
+        currency == .usd || cache?.rates[currency.rawValue] != nil
     }
 
     func formatted(usd: Double, compact: Bool = true, includesSymbol: Bool = true) -> String {
@@ -128,36 +127,34 @@ final class CurrencyStore: ObservableObject {
     }
 
     func refresh() {
-        refreshTask?.cancel()
-        let requestedCurrency = currency
-        refreshTask = Task {
-            await refreshIfNeeded(force: true, for: requestedCurrency)
+        Task { await refreshIfNeeded(force: true) }
+    }
+
+    func startAutoRefresh() {
+        Task { await refreshIfNeeded() }
+        refreshTimer?.invalidate()
+        refreshTimer = Timer.scheduledTimer(withTimeInterval: 6 * 60 * 60, repeats: true) { [weak self] _ in
+            Task { @MainActor in await self?.refreshIfNeeded() }
         }
     }
 
-    private func applyCachedRate() {
-        if currency == .usd {
-            usdRate = 1
-            lastUpdated = nil
-            refreshing = false
-        } else if let cached = cache[currency.rawValue] {
-            usdRate = cached.rate
-            lastUpdated = cached.fetchedAt
-        } else {
-            // Honest fallback: keep USD magnitude until the first rate lands,
-            // and show the USD symbol so the value is never mislabeled.
-            usdRate = 1
-            lastUpdated = nil
+    private static func validRates(_ rates: [String: Double]) -> Bool {
+        rates["USD"] == 1 && DisplayCurrency.allCases.allSatisfy {
+            guard let rate = rates[$0.rawValue] else { return false }
+            return rate.isFinite && rate > 0
         }
     }
 
-    private func refreshIfNeeded(
+    func refreshIfNeeded(
         force: Bool = false,
-        for requestedCurrency: DisplayCurrency
+        now: Date = Date(),
+        fetch: (URLRequest) async throws -> (Data, URLResponse) = {
+            try await URLSession.shared.data(for: $0)
+        }
     ) async {
-        guard requestedCurrency != .usd else { return }
-        if !force, let cached = cache[requestedCurrency.rawValue],
-           Date().timeIntervalSince(cached.fetchedAt) < Self.refreshInterval {
+        guard !refreshing else { return }
+        if !force, let cache,
+           now.timeIntervalSince(cache.fetchedAt) < Self.refreshInterval {
             return
         }
 
@@ -168,39 +165,21 @@ final class CurrencyStore: ObservableObject {
         request.timeoutInterval = 15
         request.setValue("application/json", forHTTPHeaderField: "Accept")
 
-        guard currency == requestedCurrency, !Task.isCancelled else { return }
         refreshing = true
-        defer {
-            if currency == requestedCurrency {
-                refreshing = false
-            }
-        }
+        defer { refreshing = false }
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await fetch(request)
             guard let http = response as? HTTPURLResponse,
                   http.statusCode == 200,
                   let decoded = try? JSONDecoder().decode(RateResponse.self, from: data),
                   decoded.result == "success",
-                  decoded.baseCode == "USD" else { return }
-            let fetchedAt = Date()
+                  decoded.baseCode == "USD",
+                  Self.validRates(decoded.rates) else { return }
             let sourceDate = ISO8601DateFormatter().string(
                 from: Date(timeIntervalSince1970: decoded.timeLastUpdateUnix)
             )
-            for target in DisplayCurrency.allCases where target != .usd {
-                guard let rate = decoded.rates[target.rawValue], rate.isFinite, rate > 0 else { continue }
-                cache[target.rawValue] = CachedRate(
-                    rate: rate,
-                    fetchedAt: fetchedAt,
-                    sourceDate: sourceDate
-                )
-            }
+            cache = CachedRates(rates: decoded.rates, fetchedAt: now, sourceDate: sourceDate)
             persistCache()
-            guard !Task.isCancelled,
-                  currency == requestedCurrency,
-                  let cached = cache[requestedCurrency.rawValue]
-            else { return }
-            usdRate = cached.rate
-            lastUpdated = cached.fetchedAt
         } catch {
             // Keep the most recent cached rate. Currency display should remain
             // stable when the Mac is offline or the reference API is down.
@@ -209,6 +188,6 @@ final class CurrencyStore: ObservableObject {
 
     private func persistCache() {
         guard let data = try? JSONEncoder().encode(cache) else { return }
-        UserDefaults.standard.set(data, forKey: Self.cacheKey)
+        defaults.set(data, forKey: Self.cacheKey)
     }
 }

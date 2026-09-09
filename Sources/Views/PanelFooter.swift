@@ -94,7 +94,7 @@ struct PanelFooter: View {
             case .usage: return pref.style.label.uppercased()
             case .cost:
                 return costPref.style == .dollar
-                    ? currencyStore.currency.rawValue
+                    ? currencyStore.displayCurrency.rawValue
                     : costPref.style.label
             case .overview: return currentYearString
             }
@@ -116,7 +116,7 @@ struct PanelFooter: View {
             .contentTransition(.opacity)
             .animation(.strongEaseOut, value: pref.style)
             .animation(.strongEaseOut, value: costPref.style)
-            .animation(.strongEaseOut, value: currencyStore.currency)
+            .animation(.strongEaseOut, value: currencyStore.displayCurrency)
             .animation(.strongEaseOut, value: screenPref.screen)
     }
 
