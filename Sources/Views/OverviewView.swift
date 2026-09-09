@@ -717,6 +717,8 @@ private struct ProviderSplitRow: View {
 
     private func share(_ value: Int) -> String {
         guard total > 0 else { return "0%" }
-        return "\(Int((Double(value) / Double(total) * 100).rounded()))%"
+        let percent = Double(value) / Double(total) * 100
+        if value > 0 && percent < 1 { return "<1%" }
+        return "\(Int(percent.rounded()))%"
     }
 }

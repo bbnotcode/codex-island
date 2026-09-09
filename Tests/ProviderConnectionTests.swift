@@ -81,7 +81,7 @@ struct ProviderConnectionTests {
         let unknown = try GrokConnection.parse(data(#"{"config":{"currentPeriod":{"end":"2099-01-01T00:00:00Z"}}}"#))
         expect(unknown.primary == nil && unknown.message != nil, "period-only billing does not invent zero")
         let ratio = try GrokConnection.parse(data(#"{"config":{"onDemandUsed":{"val":25},"onDemandCap":{"val":100}}}"#))
-        expect(ratio.primary?.usedFraction == 0.25, "credit amount fallback is normalized")
+        expect(ratio.primary == nil, "extra spending cannot substitute for subscription usage")
         let invalid = try GrokConnection.parse(data(#"{"config":{"creditUsagePercent":-10}}"#))
         expect(invalid.primary == nil, "negative quota is not a reading")
 
