@@ -4,8 +4,7 @@
 
 `OverviewView` observes cost data and constructs the current-year snapshot.
 `OverviewContent` receives that snapshot as a value and owns provider/day
-selection. Its model reference is used for actions, not observation: resizing
-the island should not invalidate the history summary. Page changes are received
+selection. Resizing the island does not invalidate the history summary. Page changes are received
 as events to clear day details without rebuilding the grid when no day is selected.
 
 Do not put the calendar join back in a computed property read by each summary,
@@ -46,26 +45,35 @@ blurred chart transitions, and keeping offscreen carousel pages mounted.
 Any page-unmounting optimization must preserve provider selection, outgoing
 transition content, rapid navigation, and the first-use carousel cue.
 
-## Expanded panel frame pacing
+## Content-sized carousel
 
-The carousel uses `CompositedPageStrip`: one native hosting layer moves with
-Core Animation while its SwiftUI page layout stays in place. The animation
-requests the window's display maximum, up to 120 FPS; effective Low Power Mode
-(app preference or system mode) requests a maximum of 30 FPS. The rate is read
-from the actual window screen on each movement. Interrupted navigation starts
-from the presentation layer's current position. Geometry-only changes do not
-start new page animations.
+`ContentSizedPageLayout` measures the selected page at the available width with
+an unspecified height. Its horizontal position is animatable, but its selected
+page is discrete: a half-finished swipe must not select a different page's height.
+Each page remains mounted, retaining provider selection and transition content.
+Graph pages supply their own vertical padding; calendar details participate in
+normal layout rather than requesting a fixed height increment from the model.
 
-The cost count-up timeline uses the same 120/60/30 policy and stops when settled.
-This policy is scoped to expanded content. The compact/peek glow schedule is
-unchanged, and no persistent display-link loop is added to boost idle refresh.
-Command-click chart cycling is handled inside the nested hosting view.
+The expanded island wraps this intrinsic content. Its shape and background follow
+the resulting bounds. A geometry preference mirrors those bounds into
+`IslandModel.size` for mouse hit testing; that value does not constrain expanded
+layout. There are no graph/calendar height presets or page/height subscriptions.
 
-Core Animation frame-rate ranges are scheduling requests, not guarantees of
-physical presentation. Other SwiftUI animations (such as chart-style fades)
-remain system-paced; this is not a global rendering throttle for all UI.
+The native `CompositedPageStrip` prototype remains available, but the carousel
+no longer uses its separately sized hosting view. SwiftUI owns both page sizing
+and placement. The cost count-up timeline retains its 120/60/30 frame policy;
+carousel motion is system-paced. Recheck transition performance when changing
+this layout, and do not restore a second independent source of height.
 
-Run `scripts/benchmark-rendering.sh Tests/PageStripTests.swift` to verify rate
-selection, initial placement, page movement, low-power changes, and disabled
-animation placement. The navigation benchmark now seeds usage demo data too,
-so results from before that change are not a like-for-like chart workload.
+## Page height regression checks
+
+Run `scripts/benchmark-rendering.sh Tests/PageHeightTests.swift` in a graphical
+macOS session. It measures real page heights, then opens the actual island and
+navigates 0, 5, 20, or 80 ms into its opening animation, including rapid
+cost → usage → cost → overview reversals. It verifies each destination settles
+at its measured content height. A separate layout fixture checks that an
+intermediate horizontal position still uses the selected page's intrinsic height.
+
+Testing only settled page changes misses the opening-animation interruption.
+Live checks should also select a calendar day and confirm that the detail strip
+expands the panel without clipping, then navigate back to a graph.
