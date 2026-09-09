@@ -77,7 +77,7 @@ struct CostTile: View {
                 if stylePref.style == .multi {
                     multiplierHero
                 } else if window.error != nil || (stylePref.style != .tokens && costUnavailable) {
-                    Text("—").font(Typography.chartValue).foregroundStyle(.white.opacity(0.4))
+                    Text("—").font(Typography.chartValue).foregroundStyle(Color.primary.opacity(0.4))
                 } else {
                 switch stylePref.style {
                 case .dollar: dollarHero
@@ -176,7 +176,7 @@ struct CostTile: View {
                     Text("—").font(Typography.bodyNumber)
                     Text("Plan").font(Typography.caption)
                 }
-                .foregroundStyle(.white.opacity(0.4))
+                .foregroundStyle(Color.primary.opacity(0.4))
                 .help("Monthly USD reference price is not available for this plan.")
             } else {
             barColumn(
@@ -193,7 +193,7 @@ struct CostTile: View {
                     Text("—").font(Typography.bodyNumber)
                     Text(L10n.tr("You")).font(Typography.caption)
                 }
-                .foregroundStyle(.white.opacity(0.4))
+                .foregroundStyle(Color.primary.opacity(0.4))
             } else {
             barColumn(
                 amount: spend,

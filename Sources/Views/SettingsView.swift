@@ -538,6 +538,8 @@ struct SettingsView: View {
     private var providersSection: some View {
         VStack(alignment: .leading, spacing: 0) {
             ProviderSelectionView()
+            hairline
+            sectionLabel("Codex task status")
             SettingsRow(
                 title: "Codex task status",
                 subtitle: "Show local Codex task state when the Claude side is hidden."
@@ -581,7 +583,6 @@ struct SettingsView: View {
             .opacity(codexTaskStatus.enabled ? 1 : 0.4)
         }
         .padding(.horizontal, 14)
-        .padding(.top, 18)
         .padding(.bottom, 6)
     }
 

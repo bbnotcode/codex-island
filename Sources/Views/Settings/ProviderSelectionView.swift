@@ -11,7 +11,7 @@ struct ProviderSelectionView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text(L10n.tr("On your island")).font(.system(size: 15, weight: .semibold))
                 Text(L10n.tr("Choose up to two providers."))
-                    .font(.system(size: 12)).foregroundStyle(.white.opacity(0.68))
+                    .font(.system(size: 12)).foregroundStyle(Color.primary.opacity(0.68))
                     .fixedSize(horizontal: false, vertical: true)
             }
             HStack(alignment: .bottom, spacing: 10) {
@@ -29,7 +29,7 @@ struct ProviderSelectionView: View {
                 .accessibilityLabel(L10n.tr("Swap left and right"))
                 slot(1, provider: selection.right)
             }
-            Divider().overlay(.white.opacity(0.08))
+            Divider().overlay(Color.primary.opacity(0.08))
             ForEach(selection.selected) { provider in
                 connectionRow(provider)
             }
@@ -41,7 +41,7 @@ struct ProviderSelectionView: View {
     private func slot(_ index: Int, provider: IslandProvider?) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(L10n.tr(index == 0 ? "Left" : "Right"))
-                .font(.system(size: 11, weight: .medium)).foregroundStyle(.white.opacity(0.65))
+                .font(.system(size: 11, weight: .medium)).foregroundStyle(Color.primary.opacity(0.65))
             HStack(spacing: 8) {
                 if let provider { ProviderMark(provider: provider) }
                 else { Image(systemName: "plus").frame(width: 20, height: 20) }
@@ -71,7 +71,7 @@ struct ProviderSelectionView: View {
             }
             .padding(10)
             .frame(maxWidth: .infinity, minHeight: 44)
-            .background(.white.opacity(0.065), in: RoundedRectangle(cornerRadius: 8))
+            .background(Color.primary.opacity(0.065), in: RoundedRectangle(cornerRadius: 8))
         }
         .frame(maxWidth: .infinity)
     }
@@ -87,17 +87,17 @@ struct ProviderSelectionView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         if provider == .claude, ClaudeCredentials.isReauthActionable(error) {
                             Label(L10n.tr("Sign-in required"), systemImage: "info.circle")
-                                .font(.system(size: 11)).foregroundStyle(.white.opacity(0.55))
+                                .font(.system(size: 11)).foregroundStyle(Color.primary.opacity(0.55))
                             if ClaudeCredentials.canPromptReauth() {
                                 ReauthButton(title: "Sign in with Claude")
                             } else {
                                 Text(L10n.tr("Open Claude Code and run /login."))
-                                    .font(.system(size: 12)).foregroundStyle(.white.opacity(0.65))
+                                    .font(.system(size: 12)).foregroundStyle(Color.primary.opacity(0.65))
                                     .textSelection(.enabled)
                             }
                         } else {
                             Text(L10n.tr(error))
-                                .font(.system(size: 12)).foregroundStyle(.white.opacity(0.65))
+                                .font(.system(size: 12)).foregroundStyle(Color.primary.opacity(0.65))
                         }
                     }
                     .fixedSize(horizontal: false, vertical: true)
@@ -124,9 +124,9 @@ private struct ProviderAccountHeading: View {
             if let plan = provider.planDisplayName(plan) {
                 Text(plan)
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.65))
+                    .foregroundStyle(Color.primary.opacity(0.65))
                     .padding(.horizontal, 6).padding(.vertical, 3)
-                    .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 4))
+                    .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 4))
                     .lineLimit(1).help(plan)
             }
             Spacer(minLength: 0)
@@ -175,14 +175,14 @@ struct ProviderConnectionSection: View {
                     : snapshot.needsLogin ? "Sign-in required" : "Connection unavailable"),
                     systemImage: signedIn ? "checkmark.circle" : "info.circle")
                     .font(.system(size: 11))
-                    .foregroundStyle(.white.opacity(0.55))
+                    .foregroundStyle(Color.primary.opacity(0.55))
                 if !loading {
                     if signedIn, snapshot.primary == nil {
                         Text(L10n.tr(provider == .grok ? "Credit usage unavailable" : "Usage unavailable"))
-                            .font(.system(size: 12)).foregroundStyle(.white.opacity(0.75))
+                            .font(.system(size: 12)).foregroundStyle(Color.primary.opacity(0.75))
                     } else if let message = snapshot.message {
                         Text(L10n.tr(message))
-                            .font(.system(size: 12)).foregroundStyle(.white.opacity(0.65))
+                            .font(.system(size: 12)).foregroundStyle(Color.primary.opacity(0.65))
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     if snapshot.needsLogin {
@@ -219,7 +219,7 @@ private struct ProviderMetricSelection: View {
                 controls.padding(.top, 8)
             }
             .font(.system(size: 12))
-            .tint(.white.opacity(0.65))
+            .tint(Color.primary.opacity(0.65))
         }
     }
 
@@ -241,7 +241,7 @@ private struct ProviderMetricSelection: View {
                     }
                 }
             } else if let group = displayed.first?.groupLabel {
-                Text(group).font(.system(size: 11)).foregroundStyle(.white.opacity(0.65))
+                Text(group).font(.system(size: 11)).foregroundStyle(Color.primary.opacity(0.65))
             }
             if candidates.count > 1 {
                 metricPicker(index: 0)
@@ -256,11 +256,11 @@ private struct ProviderMetricSelection: View {
                 }
             } else {
                 Text(displayed.map { L10n.tr($0.label) }.joined(separator: " · "))
-                    .font(.system(size: 11)).foregroundStyle(.white.opacity(0.65))
+                    .font(.system(size: 11)).foregroundStyle(Color.primary.opacity(0.65))
             }
             if displayed.isEmpty {
                 Text(L10n.tr("Selected metric is unavailable. Use defaults to choose an available metric."))
-                    .font(.system(size: 11)).foregroundStyle(.white.opacity(0.65))
+                    .font(.system(size: 11)).foregroundStyle(Color.primary.opacity(0.65))
             }
         }
         .controlSize(.small)

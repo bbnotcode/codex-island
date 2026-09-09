@@ -111,16 +111,6 @@ struct IslandRootView: View {
                             topPadding: max(0, (model.notch.height - 14) / 2), pillsVisible: pillsVisible)
                     }
                 }
-                .overlay(alignment: .bottomLeading) {
-                    if model.state == .expanded {
-                        SettingsButton()
-                            .modifier(ExpandedContentAppearance(
-                                usesLightPalette: expandedUsesLightSurface
-                            ))
-                            .opacity(contentVisible ? 1 : 0)
-                            .padding(6)
-                    }
-                }
                 .contentShape(IslandShape())
                 .onTapGesture {
                     // Cmd-click cycles the visualization style of whichever

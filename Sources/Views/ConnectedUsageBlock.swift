@@ -44,13 +44,13 @@ struct ProviderUsageEmptyState: View {
             }
             Text(L10n.tr(snapshot.hasNoActiveSubscription ? "No active subscription"
                 : snapshot.needsLogin ? "Connect your account" : "Usage unavailable"))
-                .font(Typography.rowTitle).foregroundStyle(.white.opacity(0.85))
+                .font(Typography.rowTitle).foregroundStyle(Color.primary.opacity(0.85))
             Text(L10n.tr(snapshot.hasNoActiveSubscription
                 ? "Connect a subscribed account or choose another provider."
                 : snapshot.needsLogin ? "Sign in to see your usage limits."
                 : "This provider hasn't reported usage limits."))
                 .font(Typography.label)
-                .foregroundStyle(.white.opacity(0.65))
+                .foregroundStyle(Color.primary.opacity(0.65))
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
             Button(L10n.tr("Open provider settings")) {
@@ -58,11 +58,11 @@ struct ProviderUsageEmptyState: View {
                 SettingsWindowController.shared.show()
             }
             .font(Typography.label)
-            .foregroundStyle(.white.opacity(0.8))
+            .foregroundStyle(Color.primary.opacity(0.8))
             .buttonStyle(PressableButtonStyle(scale: 0.97))
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
-            .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 5))
+            .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 5))
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
     }
@@ -72,7 +72,7 @@ struct ProviderDataUnavailable: View {
     let message: String
     var body: some View {
         Text(L10n.tr(message))
-            .font(.system(size: 12)).foregroundStyle(.white.opacity(0.65))
+            .font(.system(size: 12)).foregroundStyle(Color.primary.opacity(0.65))
             .multilineTextAlignment(.center)
             .padding(.horizontal, IslandPanelLayout.columnInset)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
