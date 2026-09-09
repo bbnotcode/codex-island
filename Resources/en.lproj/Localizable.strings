@@ -181,6 +181,12 @@
 "Updates" = "Updates";
 "Local customization build" = "Local customization build";
 "Official automatic updates are disabled to preserve local features. Use the sync script for updates." = "Official automatic updates are disabled to preserve local features. Use the sync script for updates.";
+"Checking the latest GitHub release without replacing local features." = "Checking the latest GitHub release without replacing local features.";
+"Version %@ is current. Local features remain protected." = "Version %@ is current. Local features remain protected.";
+"Version %@ is available. Safe sync preserves local features and rebuilds the app." = "Version %@ is available. Safe sync preserves local features and rebuilds the app.";
+"Could not check GitHub. Try again when the network is available." = "Could not check GitHub. Try again when the network is available.";
+"Safe sync" = "Safe sync";
+"Checking…" = "Checking…";
 "VALUE" = "VALUE";
 "Warn" = "Warn";
 "Warning" = "Warning";

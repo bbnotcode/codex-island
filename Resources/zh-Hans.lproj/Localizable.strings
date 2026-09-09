@@ -181,6 +181,12 @@
 "Updates" = "更新";
 "Local customization build" = "本地定制版";
 "Official automatic updates are disabled to preserve local features. Use the sync script for updates." = "已关闭官方自动更新，以保留本地功能。请使用同步脚本更新。";
+"Checking the latest GitHub release without replacing local features." = "正在检查 GitHub 最新版本，不会替换本地功能。";
+"Version %@ is current. Local features remain protected." = "当前 %@ 已是最新版，本地功能保持受保护状态。";
+"Version %@ is available. Safe sync preserves local features and rebuilds the app." = "发现新版本 %@。安全同步会保留本地功能并重新构建应用。";
+"Could not check GitHub. Try again when the network is available." = "无法检查 GitHub，请在网络可用时重试。";
+"Safe sync" = "安全同步";
+"Checking…" = "检查中…";
 "VALUE" = "价值";
 "Warn" = "警告";
 "Warning" = "警告";

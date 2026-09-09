@@ -461,17 +461,35 @@ struct SettingsView: View {
             } else {
                 SettingsRow(
                     title: "Local customization build",
-                    subtitle: "Official automatic updates are disabled to preserve local features. Use the sync script for updates."
+                    subtitle: localUpdateSubtitle
                 ) {
-                    Image(systemName: "checkmark.shield.fill")
-                        .font(Typography.label)
-                        .foregroundStyle(.green)
+                    if case .available = updater.localUpdateState {
+                        PillButton(label: "Safe sync") { updater.openLocalSyncTool() }
+                    } else {
+                        PillButton(
+                            label: updater.localUpdateState == .checking ? "Checking…" : "Check",
+                            isLoading: updater.localUpdateState == .checking
+                        ) { updater.checkForUpdates() }
+                    }
                 }
             }
         }
         .padding(.horizontal, 14)
         .padding(.top, 14)
         .padding(.bottom, 6)
+    }
+
+    private var localUpdateSubtitle: String {
+        switch updater.localUpdateState {
+        case .idle, .checking:
+            return L10n.tr("Checking the latest GitHub release without replacing local features.")
+        case .current(let version):
+            return L10n.tr("Version %@ is current. Local features remain protected.", version)
+        case .available(let version):
+            return L10n.tr("Version %@ is available. Safe sync preserves local features and rebuilds the app.", version)
+        case .failed:
+            return L10n.tr("Could not check GitHub. Try again when the network is available.")
+        }
     }
 
     private var languagePicker: some View {
