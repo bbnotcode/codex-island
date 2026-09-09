@@ -76,6 +76,8 @@ struct CountUpDollar: View {
     private func digits(_ text: String) -> some View {
         Text(text)
             .font(Typography.bigNumber)
+            .lineLimit(1)
+            .minimumScaleFactor(0.5)
             .foregroundStyle(color)
             .shadow(color: color.opacity(glowOpacity), radius: 6)
             .shadow(color: color.opacity(glowOpacity * 0.5), radius: 14)

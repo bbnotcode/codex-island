@@ -18,6 +18,7 @@ currencies and cached daily exchange rates.
 
 ### Fixed
 
+- Large converted amounts scale to fit the cost tile instead of truncating digits.
 - The expanded panel fits the selected page's content, including calendar day
   details, and settles at the correct height after rapid navigation during opening.
 - The entire Usage display row in provider settings now opens its controls.
