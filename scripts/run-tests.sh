@@ -145,6 +145,19 @@ swiftc \
 
 swiftc \
   -parse-as-library \
+  -o "$OUT_DIR/grok-billing-tests" \
+  Sources/Model/IslandProvider.swift \
+  Sources/Model/UsageDisplayModeStore.swift \
+  Sources/Usage/AppUsage.swift \
+  Sources/Usage/ConnectedUsage.swift \
+  Sources/Usage/GrokConnection.swift \
+  Sources/Usage/AntigravityConnection.swift \
+  Tests/GrokBillingTests.swift
+
+"$OUT_DIR/grok-billing-tests"
+
+swiftc \
+  -parse-as-library \
   -o "$OUT_DIR/local-provider-cost-tests" \
   Sources/Cost/TokenEvent.swift \
   Sources/Cost/LocalCostScan.swift \

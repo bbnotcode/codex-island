@@ -4,6 +4,16 @@ User-facing changes per release. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); dates are when the
 tag was cut.
 
+## [0.2.4] - 2026-09-08
+
+### Fixed
+
+- Antigravity quota now uses the agy CLI backend, correcting readings stuck at
+  100% remaining while the CLI reports usage.
+- Grok reads weekly and monthly subscription allowances without substituting
+  on-demand spending caps for subscription usage. Missing readings stay unknown.
+- Overview labels small nonzero provider shares as `<1%` instead of `0%`.
+
 ## [0.2.3] - 2026-09-08
 
 Large cost totals are easier to read: the main numbers now use digit grouping

@@ -29,8 +29,11 @@ The adapter reads `$GROK_HOME/auth.json` (default `~/.grok/auth.json`) and reque
 credit usage from the Grok CLI billing service. On expiry or HTTP 401, the app
 runs `grok models` once to let the CLI
 renew its session, then rereads credentials and retries. It never rotates or writes
-the CLI's tokens itself. The default metric is Credits. Missing percentages remain unknown;
-a billing period alone is not interpreted as zero usage.
+the CLI's tokens itself. The credits response supplies the subscription percentage
+and weekly or monthly period label. Unified billing accounts, or responses without
+a usable percentage, also query the default billing endpoint for `used / monthlyLimit`.
+On-demand spending is never substituted for included subscription quota. Missing
+percentages remain unknown; a billing period alone is not interpreted as zero usage.
 
 When a connected provider reports no readings, its column shows an actionable
 empty state instead of an empty chart and reset timer. A successfully fetched
