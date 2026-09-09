@@ -26,15 +26,16 @@ struct PageIndicator: View {
         } label: {
             Circle()
                 .fill(Color.primary.opacity(isActive ? 0.82 : 0.25))
-                .frame(width: isActive ? 8 : 7, height: isActive ? 8 : 7)
-                .frame(width: 24, height: 24)
-                .contentShape(Rectangle())
+                .frame(width: 5, height: 5)
+                // Visual stays 5pt; hit area expands ~6pt outward so the dot
+                // is reachable without pixel-precise aim.
+                .contentShape(Rectangle().inset(by: -6))
         }
-            .buttonStyle(.plain)
-            .help(L10n.tr("Switch to %@ (⌘%d)", screen.pageLabel, screen.pageIndex + 1))
-            .accessibilityLabel(accessibilityLabel(for: screen))
-            .accessibilityAddTraits(.isButton)
-            .accessibilityAddTraits(isActive ? .isSelected : [])
+        .buttonStyle(.plain)
+        .help(L10n.tr("Switch to %@ (⌘%d)", screen.pageLabel, screen.pageIndex + 1))
+        .accessibilityLabel(accessibilityLabel(for: screen))
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAddTraits(isActive ? .isSelected : [])
     }
 
     private func accessibilityLabel(for screen: ScreenPref.Screen) -> String {

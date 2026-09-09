@@ -1,10 +1,7 @@
 import SwiftUI
 import AppKit
 
-/// Bottom-left of the expanded panel: gear glyph that opens the Settings
-/// window via our hand-rolled SettingsWindowController. Replaces the older
-/// LaunchAtLoginButton — the toggle now lives inside Settings so the panel
-/// corner is no longer two near-identical power glyphs.
+/// Opens Settings from the expanded panel footer.
 struct SettingsButton: View {
     @State private var hovered = false
 

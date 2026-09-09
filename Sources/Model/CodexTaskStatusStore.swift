@@ -147,13 +147,12 @@ final class CodexTaskStatusStore: ObservableObject {
     func start() {
         guard activityCancellable == nil else { return }
         let visibility = ProviderVisibilityStore.shared
-        activityCancellable = Publishers.CombineLatest3(
+        activityCancellable = Publishers.CombineLatest(
             $enabled,
-            visibility.$claudeVisible,
-            visibility.$codexVisible
+            visibility.$selected
         )
-        .map { enabled, claudeVisible, codexVisible in
-            enabled && !claudeVisible && codexVisible
+        .map { enabled, selected in
+            enabled && !selected.contains(.claude) && selected.contains(.codex)
         }
         .removeDuplicates()
         .receive(on: DispatchQueue.main)

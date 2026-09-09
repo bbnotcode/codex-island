@@ -1,8 +1,9 @@
 import SwiftUI
+import AppKit
 
 /// Three-page horizontal carousel: live usage (page 0), cost (page 1), and
 /// history overview (page 2). Each page renders at the full content width;
-/// the HStack slides via `.offset` based on
+/// the hosting layer slides in Core Animation based on
 /// `ScreenPref.screen`. Horizontal movement gets its own drawer-style curve
 /// so page navigation does not inherit the island shape's spring bounce.
 ///
@@ -17,26 +18,40 @@ struct PagedContent: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ObservedObject var model: IslandModel
     @ObservedObject private var screenPref = ScreenPref.shared
+    @ObservedObject private var lowPower = LowPowerModeStore.shared
     @State private var peekOffset: CGFloat = 0
     @State private var bumpOffset: CGFloat = 0
 
     var body: some View {
         GeometryReader { geo in
             let pageWidth = geo.size.width
-            HStack(spacing: 0) {
-                UsageView()
-                    .offset(y: compactPageYOffset)
-                    .frame(width: pageWidth)
-                CostView()
-                    .offset(y: compactPageYOffset)
-                    .frame(width: pageWidth)
-                OverviewView(model: model)
-                    .frame(width: pageWidth)
-            }
-            .frame(width: pageWidth, height: geo.size.height, alignment: .topLeading)
-            .offset(x: (-pageWidth * CGFloat(screenPref.screen.pageIndex)) + peekOffset + bumpOffset)
-            .animation(.pageSwipe, value: screenPref.screen)
-            .clipped()
+            CompositedPageStrip(
+                pageIndex: screenPref.screen.pageIndex,
+                feedbackOffset: peekOffset + bumpOffset,
+                pageSize: geo.size,
+                lowPower: lowPower.effectiveEnabled,
+                content: HStack(alignment: .top, spacing: 0) {
+                    UsageView()
+                        .frame(width: pageWidth, height: geo.size.height, alignment: .top)
+                        .accessibilityHidden(screenPref.screen != .usage)
+                    CostView()
+                        .frame(width: pageWidth, height: geo.size.height, alignment: .top)
+                        .accessibilityHidden(screenPref.screen != .cost)
+                    OverviewView(model: model)
+                        .frame(width: pageWidth, height: geo.size.height, alignment: .top)
+                        .accessibilityHidden(screenPref.screen != .overview)
+                }
+                .onTapGesture {
+                    guard NSEvent.modifierFlags.contains(.command) else { return }
+                    switch screenPref.screen {
+                    case .usage: StylePref.shared.cycle()
+                    case .cost: CostStylePref.shared.cycle()
+                    case .overview: break
+                    }
+                }
+                .frame(width: pageWidth * 3, height: geo.size.height, alignment: .topLeading)
+            )
+            .frame(width: pageWidth, height: geo.size.height)
             .onAppear {
                 // Discoverability cue, not decorative motion — fires even
                 // when @Environment(\.accessibilityReduceMotion) is on,
@@ -76,8 +91,6 @@ struct PagedContent: View {
             }
         }
     }
-
-    private let compactPageYOffset: CGFloat = -28
 
     private func schedulePeek() {
         // 0.40s lets the panel's openMorph + content fade-in settle

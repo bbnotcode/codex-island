@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Provider titles row — Claude on the left, Codex on the right, with a
+/// Ordered provider titles with a
 /// notch-width spacer in the middle that hides the title content behind
 /// the physical notch. Lives outside `PagedContent` so it stays fixed
 /// while the data area swipes between usage/cost/overview screens.
@@ -11,137 +11,51 @@ struct PanelHeader: View {
     let notch: NotchInfo
     @ObservedObject private var visibility = ProviderVisibilityStore.shared
     @ObservedObject private var usageStore = UsageStore.shared
-    @ObservedObject private var taskStatus = CodexTaskStatusStore.shared
+    @ObservedObject private var connections = ProviderConnectionStore.shared
 
     var body: some View {
         HStack(spacing: 0) {
-            let claudeOn = visibility.claudeVisible
-            let codexOn = visibility.codexVisible
-            Group {
-                if claudeOn {
-                    providerTitle(name: "Claude", tag: usageStore.claude.plan?.uppercased(),
-                                  color: IslandColor.claude, alignment: .leading) {
-                        EmptyView()
-                    }
-                } else if codexOn && taskStatus.enabled {
-                    codexStatusTitle
-                } else {
-                    Color.clear
-                }
-            }
-            .frame(maxWidth: .infinity)
-            .animation(.openMorph, value: claudeOn)
-            .animation(.openMorph, value: taskStatus.enabled)
+            title(visibility.left, isLeft: true)
             Color.clear.frame(width: notch.width)
-            providerTitle(name: "Codex", tag: usageStore.codex.plan?.uppercased(),
-                          color: IslandColor.codex, alignment: .trailing) {
-                // Codex-only rate-limit reset credits, pinned to the Codex
-                // title so the badge unambiguously belongs to Codex — its old
-                // footer-center spot read as panel-global. Account-level like
-                // the plan tag, so it rides along on every screen.
-                CodexResetStatus()
+            if let right = visibility.right {
+                title(right, isLeft: false)
+            } else {
+                Color.clear.frame(maxWidth: .infinity)
             }
-                .opacity(codexOn ? 1 : 0)
-                .animation(.openMorph, value: codexOn)
-                .accessibilityHidden(!codexOn)
         }
-        .frame(height: 22)
-        .padding(.horizontal, 16)
-        .padding(.top, 4)
-        .padding(.bottom, min(14, max(0, notch.height - 22 - 4)))
+        .frame(height: IslandPanelLayout.headerHeight(notch: notch))
+        .padding(.horizontal, IslandPanelLayout.horizontalInset)
     }
 
-    private var codexStatusTitle: some View {
-        HStack(spacing: 8) {
-            CodexTaskStatusGlyph(status: taskStatus.snapshot.status, size: 20)
-            Text(L10n.tr("Codex task status"))
+    private func title(_ provider: IslandProvider, isLeft: Bool) -> some View {
+        let plan = provider == .claude ? usageStore.claude.plan
+            : provider == .codex ? usageStore.codex.plan : connections.snapshot(provider).plan
+        return HStack(spacing: 8) {
+            if isLeft { ProviderMark(provider: provider) }
+            else { Spacer(minLength: 0) }
+            if !isLeft, provider == .codex { CodexResetStatus() }
+            Text(provider.name)
                 .font(Typography.providerTitle)
                 .foregroundStyle(Color.primary)
-            if taskStatus.displayMode == .iconAndText
-                || taskStatus.snapshot.status.shouldForceCompactLabel {
-                Text(headerStatusLabel)
-                    .font(Typography.chip)
-                    .tracking(0.5)
-                    .foregroundStyle(CodexTaskStatusGlyph.color(for: taskStatus.snapshot.status))
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 2)
-                    .background {
-                        RoundedRectangle(cornerRadius: 3)
-                            .fill(CodexTaskStatusGlyph.color(for: taskStatus.snapshot.status).opacity(0.10))
-                    }
-            }
-            Spacer(minLength: 0)
-        }
-        .padding(.leading, 9)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(
-            L10n.tr("Codex status: %@", L10n.tr(taskStatus.snapshot.status.label))
-        )
-    }
-
-    private var headerStatusLabel: String {
-        if taskStatus.snapshot.status == .waitingApproval {
-            return L10n.tr(
-                "Approval count %d",
-                taskStatus.snapshot.waitingApprovalTaskCount
-            )
-        }
-        if taskStatus.snapshot.status == .running,
-           taskStatus.snapshot.runningTaskCount > 1 {
-            return L10n.tr(
-                "Active count %d",
-                taskStatus.snapshot.runningTaskCount
-            )
-        }
-        return L10n.tr(taskStatus.snapshot.status.compactLabel)
-    }
-
-    @ViewBuilder
-    private func providerTitle<Accessory: View>(
-        name: String,
-        tag: String?,
-        color: Color,
-        alignment: HorizontalAlignment,
-        @ViewBuilder accessory: () -> Accessory
-    ) -> some View {
-        // Push past where the overlay logo lands: 9 leading + 20 logo + 8 gap.
-        let logoOffset: CGFloat = 9 + 20 + 8
-
-        let content = HStack(spacing: 8) {
-            Text(name)
-                .font(Typography.providerTitle)
-                .foregroundStyle(Color.primary)
-            if let tag {
-                Text(tag)
+                .lineLimit(1)
+                .layoutPriority(1)
+            if let plan = provider.planDisplayName(plan) {
+                Text(plan.uppercased())
                     .font(Typography.chip)
                     .tracking(0.8)
-                    .foregroundStyle(Color.primary.opacity(0.60))
+                    .foregroundStyle(Color.primary.opacity(0.6))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
                     .padding(.horizontal, 5)
                     .padding(.vertical, 2)
-                    .background(
-                        RoundedRectangle(cornerRadius: 3)
-                            .fill(Color.primary.opacity(0.06))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 3)
-                                    .strokeBorder(Color.primary.opacity(0.10), lineWidth: 0.5)
-                            )
-                    )
+                    .background(RoundedRectangle(cornerRadius: 3).fill(Color.primary.opacity(0.06)))
+                    .help(plan)
             }
-        }
-
-        if alignment == .leading {
-            HStack {
-                content.padding(.leading, logoOffset)
+            if isLeft {
+                if provider == .codex { CodexResetStatus() }
                 Spacer(minLength: 0)
-            }
-            .frame(maxWidth: .infinity)
-        } else {
-            HStack(spacing: 10) {
-                Spacer(minLength: 0)
-                accessory()
-                content.padding(.trailing, logoOffset)
-            }
-            .frame(maxWidth: .infinity)
+            } else { ProviderMark(provider: provider) }
         }
+        .frame(maxWidth: .infinity)
     }
 }

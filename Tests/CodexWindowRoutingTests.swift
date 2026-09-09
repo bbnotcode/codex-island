@@ -221,6 +221,32 @@ struct CodexWindowRoutingTests {
         expect(collision.weekly.usedPercent == 0.90, "primary's weekly reading survives the collision")
         expect(!collision.fiveHour.hasReading, "the colliding sibling doesn't leak into 5h")
 
+        let weeklyDisplay = AppUsage(fiveHour: weeklyOnly.fiveHour, weekly: weeklyOnly.weekly,
+            plan: "prolite", reportedWindows: weeklyOnly.reported)
+        expect(weeklyDisplay.visibleWindows == [.weekly], "weekly-only plan renders one tile")
+        let twoDisplay = AppUsage(fiveHour: both.fiveHour, weekly: both.weekly,
+            plan: "pro", reportedWindows: both.reported)
+        expect(twoDisplay.visibleWindows == [.fiveHour, .weekly], "API windows override plan-name assumptions")
+        let zero = WindowUsage(usedPercent: 0, resetAt: nil, error: nil)
+        let zeroWeekly = AppUsage(fiveHour: .unknown, weekly: zero, reportedWindows: [.weekly])
+        expect(zeroWeekly.visibleWindows == [.weekly], "genuine zero-percent weekly limit remains visible")
+        expect(zeroWeekly.peekWindowIsWeekly && zeroWeekly.peekWindow.hasReading, "zero-percent weekly peek keeps its identity")
+        let error = WindowUsage(usedPercent: 0, resetAt: nil, error: "offline")
+        let failed = AppUsage(fiveHour: error, weekly: error)
+        let merged = AppUsage.merged(fetched: failed, retaining: weeklyDisplay, at: Date())
+        expect(merged.visibleWindows == [.weekly], "offline refresh cannot resurrect the absent 5h tile")
+        expect(merged.peekWindowIsWeekly, "offline weekly plan keeps weekly peek and alert routing")
+        let failedAgain = AppUsage.merged(fetched: failed, retaining: merged, at: Date())
+        expect(failedAgain.visibleWindows == [.weekly], "repeated failures retain the discovered windows")
+        let changed = AppUsage.merged(fetched: twoDisplay, retaining: merged, at: Date())
+        expect(changed.visibleWindows == [.fiveHour, .weekly], "a newly reported 5h limit returns automatically")
+        let removed = AppUsage.merged(fetched: weeklyDisplay, retaining: twoDisplay, at: Date())
+        expect(removed.visibleWindows == [.weekly], "a removed limit does not remain as a placeholder")
+        let fiveOnlyDisplay = AppUsage(fiveHour: zero, weekly: .unknown, reportedWindows: [.fiveHour])
+        expect(fiveOnlyDisplay.visibleWindows == [.fiveHour] && !fiveOnlyDisplay.peekWindowIsWeekly,
+               "five-hour-only plans keep the correct label")
+        expect(AppUsage.empty.visibleWindows.isEmpty, "cold-start unknown does not invent limit windows")
+
         print(failures == 0 ? "ALL PASS" : "\(failures) FAILURE(S)")
         exit(failures == 0 ? 0 : 1)
     }

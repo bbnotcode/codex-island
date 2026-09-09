@@ -4,6 +4,26 @@ User-facing changes per release. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); dates are when the
 tag was cut.
 
+## [0.2.1] - 2026-09-08
+
+See every supported provider's activity in one calendar, then click a provider
+in the legend to filter its history—even when it is not selected for the usage pills.
+
+### Changed
+
+- Overview combines local history from all supported providers and adds provider filters.
+- Page transitions use Core Animation, with display-aware frame pacing and a
+  30 FPS request in Low Power Mode. History preparation avoids repeated work
+  during interaction updates.
+- Antigravity has a distinct lilac color, and Settings opens with more vertical space.
+
+### Fixed
+
+- Expired Grok and Antigravity sessions get one renewal attempt through the
+  official CLI before retrying. HTTP 403 no longer implies that the user is logged out.
+- Accounts without reported usage show actionable empty states; existing cost
+  records and real zero-percent readings remain visible.
+
 ## [0.1.23] - 2026-08-14
 
 Weekly-only Codex plans get a real number in the peek pill instead of "—%".

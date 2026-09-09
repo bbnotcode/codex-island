@@ -106,3 +106,63 @@ swiftc \
   Tests/PricingPrecedenceTests.swift
 
 "$OUT_DIR/pricing-precedence-tests"
+
+swiftc \
+  -parse-as-library \
+  -o "$OUT_DIR/provider-connection-tests" \
+  Sources/Model/IslandProvider.swift \
+  Sources/Model/ProviderVisibilityStore.swift \
+  Sources/Model/UsageDisplayModeStore.swift \
+  Sources/Usage/AppUsage.swift \
+  Sources/Model/ProviderQuotaPreferences.swift \
+  Sources/Usage/ConnectedUsage.swift \
+  Sources/Usage/GrokConnection.swift \
+  Sources/Usage/AntigravityConnection.swift \
+  Tests/ProviderConnectionTests.swift
+
+"$OUT_DIR/provider-connection-tests"
+
+
+swiftc \
+  -parse-as-library \
+  -o "$OUT_DIR/antigravity-cli-tests" \
+  Sources/Model/IslandProvider.swift \
+  Sources/Model/UsageDisplayModeStore.swift \
+  Sources/Usage/AppUsage.swift \
+  Sources/Usage/ConnectedUsage.swift \
+  Sources/Usage/GrokConnection.swift \
+  Sources/Usage/AntigravityConnection.swift \
+  Tests/AntigravityCLIConnectionTests.swift
+
+"$OUT_DIR/antigravity-cli-tests"
+
+swiftc \
+  -parse-as-library \
+  -o "$OUT_DIR/local-provider-cost-tests" \
+  Sources/Cost/TokenEvent.swift \
+  Sources/Cost/LocalCostScan.swift \
+  Sources/Cost/ProtobufFields.swift \
+  Sources/Cost/AntigravityLogReader.swift \
+  Sources/Cost/GrokLogReader.swift \
+  Sources/Cost/LogParseCache.swift \
+  Sources/Cost/CostUsage.swift \
+  Sources/Cost/CostBucketing.swift \
+  Sources/Cost/CostSummary.swift \
+  Sources/Cost/PricingCatalog.swift \
+  Sources/Cost/Pricing.swift \
+  Tests/LocalProviderCostTests.swift
+
+"$OUT_DIR/local-provider-cost-tests"
+
+swiftc \
+  -parse-as-library \
+  -o "$OUT_DIR/provider-session-recovery-tests" \
+  Sources/Model/IslandProvider.swift \
+  Sources/Model/UsageDisplayModeStore.swift \
+  Sources/Usage/AppUsage.swift \
+  Sources/Usage/ConnectedUsage.swift \
+  Sources/Usage/GrokConnection.swift \
+  Sources/Usage/ProviderSessionRecovery.swift \
+  Tests/ProviderSessionRecoveryTests.swift
+
+"$OUT_DIR/provider-session-recovery-tests"

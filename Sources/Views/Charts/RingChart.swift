@@ -5,9 +5,10 @@ struct RingChart: View {
     let color: Color
     let label: String
     let sub: String
+    var centered = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: centered ? .center : .leading, spacing: 8) {
             HStack(spacing: 14) {
                 ZStack {
                     Circle().stroke(Color.primary.opacity(0.07), lineWidth: 3)
@@ -21,7 +22,7 @@ struct RingChart: View {
                         // without ever flashing 0%.
                         .animation(.strongEaseOut, value: value)
                 }
-                .frame(width: 56, height: 56)
+                .frame(width: centered ? 64 : 56, height: centered ? 64 : 56)
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(label)
@@ -39,7 +40,7 @@ struct RingChart: View {
                             .foregroundStyle(Color.primary.opacity(0.5))
                     }
                 }
-                Spacer()
+                if !centered { Spacer() }
             }
             Text(sub)
                 .font(Typography.caption)

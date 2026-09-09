@@ -1,6 +1,6 @@
 import Foundation
 
-/// The two rate-limit windows every provider reports. Named here rather than
+/// Standard rate-limit windows. A provider may report only one. Named here rather than
 /// beside the history store because they name `AppUsage`'s own two fields —
 /// and so the pure value layer stays free of store dependencies.
 enum UsageWindow: String, Codable {
@@ -77,29 +77,46 @@ struct AppUsage {
     /// or Codex's `plan_type` (free/plus/pro). nil when unknown.
     var plan: String?
 
-    init(fiveHour: WindowUsage, weekly: WindowUsage, plan: String? = nil) {
+    // nil means no successful window discovery yet, not a two-window plan.
+    var reportedWindows: [UsageWindow]?
+
+    init(fiveHour: WindowUsage, weekly: WindowUsage, plan: String? = nil,
+         reportedWindows: [UsageWindow]? = nil) {
         self.fiveHour = fiveHour
         self.weekly = weekly
         self.plan = plan
+        self.reportedWindows = reportedWindows
     }
 
     static let empty = AppUsage(fiveHour: .unknown, weekly: .unknown)
 
+    var visibleWindows: [UsageWindow] {
+        let order: [UsageWindow] = [.fiveHour, .weekly]
+        if let reportedWindows { return order.filter { reportedWindows.contains($0) } }
+        return order.filter { !window($0).isUnreported }
+    }
+
+    func window(_ kind: UsageWindow) -> WindowUsage {
+        kind == .fiveHour ? fiveHour : weekly
+    }
+
     var preferredWindow: (kind: UsageWindow, usage: WindowUsage) {
-        // An exhausted long-term allowance is the effective account limit:
-        // spare capacity in the 5h window cannot be used until the weekly
-        // window resets. Surface the binding constraint in compact chrome
-        // and alerts instead of presenting an unusable short-term balance.
-        if weekly.isExhausted { return (.weekly, weekly) }
-        if fiveHour.hasReading { return (.fiveHour, fiveHour) }
-        return (.weekly, weekly)
+        if weekly.isExhausted, visibleWindows.contains(.weekly) {
+            return (.weekly, weekly)
+        }
+        if visibleWindows == [.weekly] || !fiveHour.hasReading {
+            return (.weekly, weekly)
+        }
+        return (.fiveHour, fiveHour)
     }
 
     var peekWindow: WindowUsage { preferredWindow.usage }
 
     /// Which window `peekWindow` selected — the peek chrome (VoiceOver label,
     /// window-length fallback glyph) must describe the same window it shows.
-    var peekWindowIsWeekly: Bool { preferredWindow.kind == .weekly }
+    var peekWindowIsWeekly: Bool {
+        preferredWindow.kind == .weekly
+    }
 
     /// Fold a fetch result into the values currently on screen.
     ///
@@ -132,7 +149,8 @@ struct AppUsage {
             ),
             // Plan tier is read from the credential store, not the usage
             // response, so a failed fetch shouldn't blank the chip's badge.
-            plan: fetched.plan ?? prior.plan
+            plan: fetched.plan ?? prior.plan,
+            reportedWindows: fetched.reportedWindows ?? prior.reportedWindows
         )
     }
 
