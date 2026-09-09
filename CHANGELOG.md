@@ -4,6 +4,12 @@ User-facing changes per release. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); dates are when the
 tag was cut.
 
+## [0.2.3] - 2026-09-08
+
+Large cost totals are easier to read: the main numbers now use digit grouping
+such as `1,964,040`, including during the count-up animation. Separators follow
+the app's locale, and the full amount still scales to fit its tile.
+
 ## [0.2.2] - 2026-09-08
 
 View estimated token costs in your preferred currency, with nine display
