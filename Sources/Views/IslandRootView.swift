@@ -6,6 +6,7 @@ struct IslandRootView: View {
     @ObservedObject private var visibility = ProviderVisibilityStore.shared
     @ObservedObject private var alwaysShow = AlwaysShowUsageStore.shared
     @ObservedObject private var appearanceStore = AppearanceStore.shared
+    @ObservedObject private var taskStatus = CodexTaskStatusStore.shared
     @State private var hovering = false
     @State private var contentVisible = false
     @State private var pillsVisible = false
@@ -77,7 +78,7 @@ struct IslandRootView: View {
                     }
                 }
                 .overlay(alignment: .topLeading) {
-                    if model.state != .expanded {
+                    if model.state != .expanded, !usesCodexStatusCompanion {
                         ProviderMark(provider: visibility.left)
                             .padding(.leading, logoEdgePadding)
                             .padding(.top, max(0, (model.notch.height - 20) / 2))
@@ -93,20 +94,20 @@ struct IslandRootView: View {
                     }
                 }
                 .overlay(alignment: .topTrailing) {
-                    if model.state != .expanded, let right = visibility.right {
+                    if model.state != .expanded, let right = compactRightProvider {
                         ProviderMark(provider: right)
                             .padding(.trailing, logoEdgePadding)
                             .padding(.top, max(0, (model.notch.height - 20) / 2))
                     }
                 }
                 .overlay(alignment: .topLeading) {
-                    if model.state != .compact {
+                    if model.state != .compact, !usesCodexStatusCompanion {
                         PeekPillOverlay(provider: visibility.left, isLeft: true,
                             topPadding: max(0, (model.notch.height - 14) / 2), pillsVisible: pillsVisible)
                     }
                 }
                 .overlay(alignment: .topTrailing) {
-                    if model.state != .compact, let right = visibility.right {
+                    if model.state != .compact, let right = compactRightProvider {
                         PeekPillOverlay(provider: right, isLeft: false,
                             topPadding: max(0, (model.notch.height - 14) / 2), pillsVisible: pillsVisible)
                     }
@@ -307,6 +308,17 @@ struct IslandRootView: View {
         case .dark: return false
         case .system: return systemColorScheme == .light
         }
+    }
+
+    /// A single Codex provider still uses two visual roles: task execution
+    /// on the left and Codex quota on the right. Treating Codex as the left
+    /// provider as well made both compact overlays occupy the same pixels.
+    private var usesCodexStatusCompanion: Bool {
+        taskStatus.enabled && visibility.selected == [.codex]
+    }
+
+    private var compactRightProvider: IslandProvider? {
+        usesCodexStatusCompanion ? .codex : visibility.right
     }
 
     private var accessibilityHintForState: String {
