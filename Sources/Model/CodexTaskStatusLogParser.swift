@@ -94,7 +94,9 @@ struct CodexTaskStatusLogParser {
         "mcp_tool_call_end",
     ].map { Data("\"\($0)\"".utf8) }
     private static let permissionRequestMarker = Data("\"request_permissions\"".utf8)
+    private static let escalatedPermissionMarker = Data("require_escalated".utf8)
     private static let functionOutputMarker = Data("\"function_call_output\"".utf8)
+    private static let customToolOutputMarker = Data("\"custom_tool_call_output\"".utf8)
     private static let activityMarkers = [
         "agent_message", "message", "reasoning", "function_call",
         "function_call_output", "custom_tool_call", "custom_tool_call_output",
@@ -434,7 +436,10 @@ struct CodexTaskStatusLogParser {
         guard line.count < 1_048_576,
               lifecycleMarkers.contains(where: { line.range(of: $0) != nil })
                 || line.range(of: permissionRequestMarker) != nil
-                || (expectsPermissionOutput && line.range(of: functionOutputMarker) != nil)
+                || line.range(of: escalatedPermissionMarker) != nil
+                || (expectsPermissionOutput
+                    && (line.range(of: functionOutputMarker) != nil
+                        || line.range(of: customToolOutputMarker) != nil))
                 || activityMarkers.contains(where: { line.range(of: $0) != nil }),
               let raw = try? JSONSerialization.jsonObject(
                 with: Data(line)
@@ -463,7 +468,21 @@ struct CodexTaskStatusLogParser {
            let callID = payload["call_id"] as? String {
             return .permissionRequested(callID)
         }
+        if type == "function_call",
+           requestsEscalatedPermission(payload["arguments"]),
+           let callID = payload["call_id"] as? String {
+            return .permissionRequested(callID)
+        }
         if type == "function_call_output", expectsPermissionOutput,
+           let callID = payload["call_id"] as? String {
+            return .permissionResolved(callID)
+        }
+        if type == "custom_tool_call",
+           requestsEscalatedPermission(payload["input"]),
+           let callID = payload["call_id"] as? String {
+            return .permissionRequested(callID)
+        }
+        if type == "custom_tool_call_output", expectsPermissionOutput,
            let callID = payload["call_id"] as? String {
             return .permissionResolved(callID)
         }
@@ -475,5 +494,11 @@ struct CodexTaskStatusLogParser {
             return .activity
         }
         return nil
+    }
+
+    private static func requestsEscalatedPermission(_ value: Any?) -> Bool {
+        guard let text = value as? String else { return false }
+        return text.contains("sandbox_permissions")
+            && text.contains("require_escalated")
     }
 }

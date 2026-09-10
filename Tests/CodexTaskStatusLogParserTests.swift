@@ -52,6 +52,24 @@ struct CodexTaskStatusLogParserTests {
         ])
     }
 
+    static func escalatedToolCall(_ callID: String) -> Data {
+        responseItem([
+            "type": "custom_tool_call",
+            "name": "exec",
+            "call_id": callID,
+            "status": "completed",
+            "input": #"const result = await tools.exec_command({sandbox_permissions: \"require_escalated\"})"#,
+        ])
+    }
+
+    static func customToolOutput(_ callID: String) -> Data {
+        responseItem([
+            "type": "custom_tool_call_output",
+            "call_id": callID,
+            "output": "approved",
+        ])
+    }
+
     static func sessionMeta(subagent: Bool) -> Data {
         let source: Any = subagent
             ? ["subagent": ["other": "guardian"]]
@@ -341,6 +359,25 @@ struct CodexTaskStatusLogParserTests {
             approvedResult?.state == .running
                 && approvedResult?.soundEvents.isEmpty == true,
             "permission output resumes running without another alert"
+        )
+
+        let escalatedTask = directory.appendingPathComponent("rollout-escalated-task.jsonl")
+        let escalatedCallID = "call-escalated"
+        var escalatedData = event("task_started")
+        escalatedData.append(escalatedToolCall(escalatedCallID))
+        try escalatedData.write(to: escalatedTask)
+        let escalatedResult = CodexTaskStatusLogParser.parseUpdate(at: escalatedTask)
+        expect(
+            escalatedResult?.state == .waitingApproval
+                && escalatedResult?.soundEvents == [.approvalRequired],
+            "escalated custom tool call waits for approval and emits an alert"
+        )
+        try customToolOutput(escalatedCallID).append(to: escalatedTask)
+        let escalatedApprovedResult = CodexTaskStatusLogParser.parseUpdate(at: escalatedTask)
+        expect(
+            escalatedApprovedResult?.state == .running
+                && escalatedApprovedResult?.soundEvents.isEmpty == true,
+            "custom tool output resumes running after approval"
         )
 
         let subagentLog = directory.appendingPathComponent("rollout-subagent.jsonl")
