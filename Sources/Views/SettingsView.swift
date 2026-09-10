@@ -15,6 +15,7 @@ struct SettingsView: View {
     @ObservedObject private var tokenMode = TokenCountModeStore.shared
     @ObservedObject private var lowPower = LowPowerModeStore.shared
     @ObservedObject private var alwaysShow = AlwaysShowUsageStore.shared
+    @ObservedObject private var autoCollapse = AutoCollapseDelayStore.shared
     @ObservedObject private var alertPrefs = AlertThresholdStore.shared
     @ObservedObject private var spacing = IslandSpacingStore.shared
     @ObservedObject private var usageDisplay = UsageDisplayModeStore.shared
@@ -230,6 +231,12 @@ struct SettingsView: View {
                 SettingsToggle(isOn: alwaysShow.enabled) {
                     alwaysShow.enabled.toggle()
                 }
+            }
+            SettingsRow(
+                title: "Auto-collapse delay",
+                subtitle: "How long the expanded panel stays open after the pointer leaves."
+            ) {
+                autoCollapseSlider
             }
             SettingsRow(
                 title: "Low Power Mode",
@@ -846,6 +853,33 @@ struct SettingsView: View {
             label: { Self.label(for: $0) },
             accessibilityPrefix: "Refresh interval"
         )
+    }
+
+    private var autoCollapseSlider: some View {
+        HStack(spacing: 10) {
+            Slider(
+                value: Binding(
+                    get: { Double(autoCollapse.milliseconds) / 1_000 },
+                    set: { autoCollapse.milliseconds = Int(($0 * 1_000).rounded()) }
+                ),
+                in: 0.5...3,
+                step: 0.5
+            )
+            .frame(width: 150)
+            .accessibilityLabel(L10n.tr("Auto-collapse delay"))
+            .accessibilityValue(Self.collapseDelayLabel(for: autoCollapse.milliseconds))
+
+            Text(Self.collapseDelayLabel(for: autoCollapse.milliseconds))
+                .font(Typography.label.monospacedDigit())
+                .foregroundStyle(Color.primary.opacity(0.72))
+                .frame(width: 34, alignment: .trailing)
+        }
+    }
+
+    private static func collapseDelayLabel(for milliseconds: Int) -> String {
+        milliseconds % 1_000 == 0
+            ? "\(milliseconds / 1_000)s"
+            : String(format: "%.1fs", Double(milliseconds) / 1_000)
     }
 
     private static func label(for seconds: Int) -> String {

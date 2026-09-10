@@ -220,6 +220,8 @@
 "Expanded" = "已展开";
 "Collapsed" = "已收起";
 "How often to refresh." = "刷新频率。";
+"Auto-collapse delay" = "自动收起延迟";
+"How long the expanded panel stays open after the pointer leaves." = "光标移开后，展开面板保持打开的时间。";
 "Percentages" = "百分比";
 "Remaining" = "剩余";
 "Show usage as used or remaining quota." = "将用量百分比显示为已用或剩余额度。";

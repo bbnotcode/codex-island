@@ -5,6 +5,7 @@ struct IslandRootView: View {
     @ObservedObject var model: IslandModel
     @ObservedObject private var visibility = ProviderVisibilityStore.shared
     @ObservedObject private var alwaysShow = AlwaysShowUsageStore.shared
+    @ObservedObject private var autoCollapse = AutoCollapseDelayStore.shared
     @ObservedObject private var appearanceStore = AppearanceStore.shared
     @ObservedObject private var taskStatus = CodexTaskStatusStore.shared
     @State private var hovering = false
@@ -287,11 +288,10 @@ struct IslandRootView: View {
     }
 
     private func scheduleCollapseAfterHoverExit() {
-        // 1.5s is long enough to cross a small pointer gap or return after an
-        // accidental exit, without leaving the expanded dashboard hanging.
+        let delay = autoCollapse.seconds
         let request = UUID()
         collapseRequest = request
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
             guard collapseRequest == request, !hovering else { return }
             withAnimation(.easeOut(duration: 0.12)) {
                 contentVisible = false

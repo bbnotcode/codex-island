@@ -39,6 +39,14 @@ swiftc \
 
 swiftc \
   -parse-as-library \
+  -o "$OUT_DIR/auto-collapse-delay-tests" \
+  Sources/Model/AutoCollapseDelayStore.swift \
+  Tests/AutoCollapseDelayTests.swift
+
+"$OUT_DIR/auto-collapse-delay-tests"
+
+swiftc \
+  -parse-as-library \
   -o "$OUT_DIR/codex-task-status-log-parser-tests" \
   Sources/Model/CodexTaskStatusLogParser.swift \
   Tests/CodexTaskStatusLogParserTests.swift

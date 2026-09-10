@@ -220,6 +220,8 @@
 "Expanded" = "Expanded";
 "Collapsed" = "Collapsed";
 "How often to refresh." = "How often to refresh.";
+"Auto-collapse delay" = "Auto-collapse delay";
+"How long the expanded panel stays open after the pointer leaves." = "How long the expanded panel stays open after the pointer leaves.";
 "Percentages" = "Percentages";
 "Remaining" = "Remaining";
 "Show usage as used or remaining quota." = "Show usage as used or remaining quota.";
