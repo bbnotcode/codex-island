@@ -131,7 +131,7 @@
 "Cancelled short" = "取消";
 "Error" = "异常";
 "Unavailable" = "不可用";
-"Unavailable short" = "未知";
+"Unavailable short" = "状态不可用";
 "Open this task in Codex" = "在 Codex 中打开此任务";
 "Unable to open Codex" = "无法打开 Codex";
 "Codex is not installed on this Mac." = "这台 Mac 尚未安装 Codex。";

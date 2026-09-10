@@ -131,7 +131,7 @@
 "Cancelled short" = "Cancelled";
 "Error" = "Error";
 "Unavailable" = "Unavailable";
-"Unavailable short" = "Unknown";
+"Unavailable short" = "Unavailable";
 "Open this task in Codex" = "Open this task in Codex";
 "Unable to open Codex" = "Unable to open Codex";
 "Codex is not installed on this Mac." = "Codex is not installed on this Mac.";

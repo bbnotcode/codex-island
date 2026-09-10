@@ -101,7 +101,7 @@ final class CodexTaskStatusStore: ObservableObject {
         }
     }
     @Published private(set) var snapshot = Snapshot(
-        status: .unavailable,
+        status: .idle,
         threadID: nil,
         updatedAt: nil,
         startedAt: nil,
@@ -572,10 +572,17 @@ final class CodexTaskStatusStore: ObservableObject {
             }
             return (lhs.updatedAt ?? .distantPast) < (rhs.updatedAt ?? .distantPast)
         }) else {
+            let confirmedUnavailable = CodexTaskStatusAvailabilityPolicy
+                .hasConfirmedUnparseableFiles(
+                    fingerprint: fingerprint,
+                    previousFingerprint: previousFingerprint
+                )
             return ScanResult(
-                fingerprint: fingerprint,
+                fingerprint: CodexTaskStatusAvailabilityPolicy.retryFingerprint(
+                    for: fingerprint
+                ),
                 snapshot: Snapshot(
-                    status: .unavailable,
+                    status: confirmedUnavailable ? .unavailable : .idle,
                     threadID: nil,
                     updatedAt: nil,
                     startedAt: nil,

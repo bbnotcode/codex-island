@@ -85,6 +85,21 @@ enum CodexTaskStatusDirectoryPolicy {
     }
 }
 
+enum CodexTaskStatusAvailabilityPolicy {
+    private static let unparsedPrefix = "unparsed\n"
+
+    static func retryFingerprint(for fingerprint: String) -> String {
+        unparsedPrefix + fingerprint
+    }
+
+    static func hasConfirmedUnparseableFiles(
+        fingerprint: String,
+        previousFingerprint: String?
+    ) -> Bool {
+        previousFingerprint == retryFingerprint(for: fingerprint)
+    }
+}
+
 struct CodexTaskStatusLogParser {
     private static let newline: UInt8 = 0x0A
     private static let cache = StateCache()

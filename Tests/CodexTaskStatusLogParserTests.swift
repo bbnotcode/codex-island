@@ -271,6 +271,32 @@ struct CodexTaskStatusLogParserTests {
             "terminal decay phase changes after ten minutes"
         )
 
+        let unparsedFingerprint = "recent-rollout|123|456"
+        let retryFingerprint = CodexTaskStatusAvailabilityPolicy.retryFingerprint(
+            for: unparsedFingerprint
+        )
+        expect(
+            !CodexTaskStatusAvailabilityPolicy.hasConfirmedUnparseableFiles(
+                fingerprint: unparsedFingerprint,
+                previousFingerprint: nil
+            ),
+            "first unparseable scan keeps the neutral idle state"
+        )
+        expect(
+            CodexTaskStatusAvailabilityPolicy.hasConfirmedUnparseableFiles(
+                fingerprint: unparsedFingerprint,
+                previousFingerprint: retryFingerprint
+            ),
+            "repeated unparseable scan confirms unavailable state"
+        )
+        expect(
+            !CodexTaskStatusAvailabilityPolicy.hasConfirmedUnparseableFiles(
+                fingerprint: "changed-rollout|124|500",
+                previousFingerprint: retryFingerprint
+            ),
+            "changed logs receive a fresh parsing grace period"
+        )
+
         let utcBoundary = ISO8601DateFormatter().date(
             from: "2026-08-07T01:00:00Z"
         )!
