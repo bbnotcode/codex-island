@@ -4,6 +4,25 @@ User-facing changes per release. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); dates are when the
 tag was cut.
 
+## [0.2.5] - 2026-09-10
+
+### Added
+
+- Turn your AI usage into a shareable card with token totals or estimated API
+  value, provider breakdowns, and a cumulative chart. Choose 7 days, 30 days,
+  3 months, this year, or all time, then share or export a PNG in three formats.
+  API value is explicitly an estimate, not a bill.
+- Captured usage stays in a private local archive even after provider logs are
+  removed. Repeated scans preserve history without duplicating the same calls.
+- Preview and recover Claude usage from surviving logs, Cowork records, and
+  older backups in Settings. Imports back up the archive and leave source files
+  untouched; daily totals without model details remain unpriced.
+
+### Fixed
+
+- Space quota rings evenly within provider columns.
+- Populate Grok and Antigravity cost views in opt-in demo mode.
+
 ## [0.2.4] - 2026-09-08
 
 ### Fixed
