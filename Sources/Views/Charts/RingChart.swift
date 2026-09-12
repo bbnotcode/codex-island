@@ -40,7 +40,6 @@ struct RingChart: View {
                             .foregroundStyle(Color.primary.opacity(0.5))
                     }
                 }
-                if !centered { Spacer() }
             }
             Text(sub)
                 .font(Typography.caption)

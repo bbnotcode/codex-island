@@ -40,6 +40,10 @@ struct PanelFooter: View {
                     SettingsButton()
                     chip
 
+                    if screenPref.screen == .overview {
+                        WeeklyCardButton()
+                    }
+
                     if !activeStyleCycled {
                         HStack(spacing: 5) {
                             Image(systemName: "command")
@@ -164,7 +168,7 @@ struct PanelFooter: View {
                         .font(Typography.label)
                         .foregroundStyle(Color.primary.opacity(0.55))
                 } else if localNotice != nil {
-                    Text("Check local records")
+                    Text(AppEnvironment.isDemo ? "Demo data" : "Check local records")
                         .font(Typography.label).foregroundStyle(Color.primary.opacity(0.55))
                 } else if connectionNeedsAttention {
                     Text(L10n.tr("Check connection"))

@@ -29,6 +29,7 @@ struct SettingsView: View {
     @ObservedObject private var updater = UpdaterController.shared
 
     @AppStorage("Settings.activeTab") private var activeTabRaw: String = SettingsTab.general.rawValue
+    @State private var recoveryPresented = false
 
     private var activeTab: SettingsTab {
         get { SettingsTab(rawValue: activeTabRaw) ?? .general }
@@ -73,6 +74,12 @@ struct SettingsView: View {
         .frame(minWidth: 440, minHeight: 560)
         .background(IslandColor.settingsBackground)
         .preferredColorScheme(appearanceStore.appearance.colorScheme)
+        .sheet(isPresented: $recoveryPresented) {
+            ClaudeRecoveryView(model: ClaudeRecoveryModel(onSaved: {
+                CostStore.shared.refresh()
+                NotificationCenter.default.post(name: .codexIslandUsageHistoryRecovered, object: nil)
+            }))
+        }
     }
 
     // MARK: - Tabs
@@ -133,6 +140,23 @@ struct SettingsView: View {
     private var generalTab: some View {
         VStack(alignment: .leading, spacing: 0) {
             generalSection
+            SettingsRow(title: "Usage card", subtitle: "Your time with AI, ready to share.") {
+                Button(L10n.tr("Create card…")) { WeeklyCardWindowController.shared.show() }
+                    .controlSize(.small)
+            }
+            .padding(.horizontal, 14)
+            SettingsRow(title: "Usage history", subtitle: "Find older Claude counts.") {
+                HStack(spacing: 8) {
+                    RecoveryHelp(
+                        title: "Why recover usage?",
+                        explanation: "Older usage can be missing when Claude logs have been deleted or moved. Recovery checks the records still on your Mac and any backups you add. It saves only missing counts, so scanning again won't duplicate your usage."
+                    )
+                    Button(L10n.tr("Recover Claude usage…")) { recoveryPresented = true }
+                        .controlSize(.small)
+                        .disabled(AppEnvironment.isDemo)
+                }
+            }
+            .padding(.horizontal, 14)
             alertsSection
             updatesSection
         }

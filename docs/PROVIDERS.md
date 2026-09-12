@@ -131,3 +131,10 @@ Antigravity uses a separate hue from Codex so adjacent providers are recognizabl
 at a glance. Green, amber, and red remain reserved for status and alerts. Keep
 provider names and distinct marks visible so identification never depends only
 on color.
+
+## Demo mode
+
+`CODEXISLAND_DEMO=1` also supplies synthetic Grok and Antigravity cost totals,
+cumulative trends, and overview token history. VALUE uses illustrative monthly
+plan baselines ($30 and $19.99 respectively) only in demo mode. These fixtures
+never write the real cost cache or establish live subscription prices.

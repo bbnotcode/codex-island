@@ -175,7 +175,7 @@ swiftc \
   Sources/Cost/LogParseCache.swift \
   Sources/Cost/CostUsage.swift \
   Sources/Cost/CostBucketing.swift \
-  Sources/Cost/CostSummary.swift \
+  Sources/Cost/HistoricalUsageDay.swift Sources/Cost/CostSummary.swift \
   Sources/Cost/PricingCatalog.swift \
   Sources/Cost/Pricing.swift \
   Tests/LocalProviderCostTests.swift
@@ -194,3 +194,7 @@ swiftc \
   Tests/ProviderSessionRecoveryTests.swift
 
 "$OUT_DIR/provider-session-recovery-tests"
+
+bash scripts/test-weekly-card.sh
+bash scripts/test-usage-ledger.sh
+bash scripts/test-claude-recovery.sh
