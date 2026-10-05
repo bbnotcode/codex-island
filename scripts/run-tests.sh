@@ -7,6 +7,8 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
+python3 Tests/SyncUpstreamTests.py
+
 OUT_DIR=$(mktemp -d)
 trap 'rm -rf "$OUT_DIR"' EXIT
 

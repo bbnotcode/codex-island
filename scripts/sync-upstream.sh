@@ -37,17 +37,18 @@ run_validation() {
     if [[ -n "$sdk" ]]; then
       SDKROOT="$sdk" \
         CLANG_MODULE_CACHE_PATH="${TMPDIR:-/tmp}/codex-island-module-cache" \
-        ./scripts/run-tests.sh
+        ./scripts/run-tests.sh || return $?
     else
       CLANG_MODULE_CACHE_PATH="${TMPDIR:-/tmp}/codex-island-module-cache" \
-        ./scripts/run-tests.sh
+        ./scripts/run-tests.sh || return $?
     fi
   fi
 
   if [[ "${SYNC_BUILD_APP:-0}" == "1" ]]; then
     echo "Building CodexIsland..."
-    ./build.sh
+    ./build.sh || return $?
   fi
+  return 0
 }
 
 case "$ACTION" in
